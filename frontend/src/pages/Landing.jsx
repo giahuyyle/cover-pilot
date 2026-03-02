@@ -5,14 +5,17 @@ const offerings = [
     {
         text: "Instant Productivity",
         logo: Zap,
+        target: "productivity",
     },
     {
         text: "Template Market",
         logo: Globe,
+        target: "templates",
     },
     {
         text: "Advanced Technology",
         logo: ShieldCheck,
+        target: "advanced-technology",
     },
 ];
 
@@ -103,6 +106,7 @@ export default function Landing() {
                             <button 
                                 key={index} 
                                 className="text-black bg-[rgb(219,252,167)] hover:bg-[rgb(108,144,46)] mt-5 py-5 px-2 rounded-md flex flex-col items-center justify-center cursor-pointer"
+                                onClick={() => document.getElementById(offering.target)?.scrollIntoView({ behavior: 'smooth' })}
                             >
                                 <offering.logo className="w-6 h-6" />
                                 <p className="mt-3 font-extralight text-wrap">{offering.text}</p>
@@ -134,7 +138,7 @@ export default function Landing() {
                     <img 
                         src="/landing/landing-hero.jpg" 
                         alt="Landing Hero"
-                        className="px-5 py-5 rounded-4xl mb-5"
+                        className="px-5 py-5 rounded-4xl mb-5 mx-auto"
                     />
                     <p className="font-extralight text-lg text-wrap justify-center flex">We escalate editing efficiency</p>
                     <p className="font-extralight text-lg text-wrap justify-center flex">and productivity</p>
@@ -146,7 +150,7 @@ export default function Landing() {
                     </div>
                 </div>
                 
-                <hr className="my-10 border-gray-300" />
+                <hr className="my-10 mx-5 border-gray-300" />
                 
                 <div
                     id="productivity"
@@ -174,7 +178,7 @@ export default function Landing() {
                     </div>
                 </div>
 
-                <hr className="my-10 border-gray-300" />
+                <hr className="my-10 mx-5 border-gray-300" />
 
                 <div
                     id="templates"
@@ -195,7 +199,7 @@ export default function Landing() {
                     </div>
                 </div>
 
-                <hr className="my-10 border-gray-300" />
+                <hr className="my-10 mx-5 border-gray-300" />
 
                 <div
                     id="advanced-technology"
