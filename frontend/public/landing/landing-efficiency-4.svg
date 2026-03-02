@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- Store/market building -->
+  <rect x="16" y="44" width="88" height="60" rx="3" stroke="#3C4514" stroke-width="3.5" fill="none"/>
+  <!-- Awning/canopy -->
+  <path d="M12 44 L12 34 Q12 24 28 24 L92 24 Q108 24 108 34 L108 44" stroke="#3C4514" stroke-width="3.5" fill="none"/>
+  <!-- Awning scallops -->
+  <path d="M12 44 Q22 54 34 44 Q44 54 56 44 Q66 54 78 44 Q88 54 100 44 Q108 54 108 44" stroke="#3C4514" stroke-width="2.5" fill="none"/>
+  <!-- Door -->
+  <rect x="48" y="74" width="24" height="30" rx="2" stroke="#3C4514" stroke-width="2.5" fill="none"/>
+  <circle cx="66" cy="90" r="2" fill="#3C4514"/>
+  <!-- Left window -->
+  <rect x="22" y="56" width="20" height="16" rx="2" stroke="#3C4514" stroke-width="2.5" fill="none"/>
+  <line x1="32" y1="56" x2="32" y2="72" stroke="#3C4514" stroke-width="1.5"/>
+  <line x1="22" y1="64" x2="42" y2="64" stroke="#3C4514" stroke-width="1.5"/>
+  <!-- Right window -->
+  <rect x="78" y="56" width="20" height="16" rx="2" stroke="#3C4514" stroke-width="2.5" fill="none"/>
+  <line x1="88" y1="56" x2="88" y2="72" stroke="#3C4514" stroke-width="1.5"/>
+  <line x1="78" y1="64" x2="98" y2="64" stroke="#3C4514" stroke-width="1.5"/>
+  <!-- Small "OPEN" sign on door -->
+  <rect x="53" y="78" width="14" height="6" rx="1" stroke="#3C4514" stroke-width="1" fill="none" opacity="0.6"/>
+  <!-- Signboard on top -->
+  <rect x="38" y="10" width="44" height="12" rx="3" stroke="#3C4514" stroke-width="2" fill="none"/>
+  <line x1="46" y1="14" x2="74" y2="14" stroke="#3C4514" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <!-- Flag -->
+  <line x1="100" y1="8" x2="100" y2="24" stroke="#3C4514" stroke-width="2" stroke-linecap="round"/>
+  <polygon points="100,8 114,12 100,16" fill="#3C4514" opacity="0.7"/>
+</svg>
