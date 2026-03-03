@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { Zap, Globe, ShieldCheck } from "lucide-react";
+import Footer from "@/components/Footer";
 
 const offerings = [
     {
@@ -203,7 +204,7 @@ export default function Landing() {
 
                 <div
                     id="advanced-technology"
-                    className="mt-10 px-5"
+                    className="my-10 px-5"
                 >
                     <img src="/landing/landing-software-quality.png" alt="Software Quality" className="rounded-2xl"/>
 
@@ -217,34 +218,7 @@ export default function Landing() {
                     {/* TODO: implement last part of advanced technology section */}
                 </div>
 
-                <footer className="mt-20 py-10 px-10 w-full bg-gray-200">
-                    <div className="flex flex-row">
-                        <img src="/logo-transparent.svg" alt="Cover Pilot Footer Logo" className="h-50" />
-
-                        <div className="ml-auto mr-20 flex flex-row gap-5">
-                            
-                            <div className="mt-5 flex flex-col">
-                                <p className="text-sm font-extralight text-gray-500">
-                                    Contact
-                                </p>
-                                <a href="mailto:cover.pilot@gmail.com" className="mt-2 hover:underline cursor-pointer">
-                                    cover.pilot@gmail.com
-                                </a>
-                                <a href="https://www.instagram.com/coverpilot" className="hover:underline cursor-pointer">
-                                    Instagram
-                                </a>
-
-                                <Link className="hover:underline cursor-pointer text-gray-500 mt-10" to="/terms">
-                                    Terms & Conditions
-                                </Link>
-                                <Link className="hover:underline cursor-pointer text-gray-500" to="/privacy">
-                                    Privacy
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                    
-                </footer>
+                <Footer />
             </div>
         </div>
     );
