@@ -38,3 +38,6 @@ htmlcov/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Firebase service account keys
+serviceAccountKey.json
