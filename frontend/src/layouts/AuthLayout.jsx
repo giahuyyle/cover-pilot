@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { auth } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, browserSessionPersistence, setPersistence } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, browserSessionPersistence, setPersistence, fetchSignInMethodsForEmail } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useState, useEffect } from "react";
 
@@ -127,14 +127,19 @@ export default function AuthLayout({ isLogin = true }) {
                     setAuthError("This email is already registered.");
                     break;
                 case "auth/invalid-credential":
+                case "auth/wrong-password":
+                case "auth/user-not-found": {
+                    // Check if this email was registered via Google
+                    try {
+                        const methods = await fetchSignInMethodsForEmail(auth, data.email);
+                        if (methods.includes("google.com") && !methods.includes("password")) {
+                            setAuthError("This account was signed up via Google. Please use the Sign In with Google button below to access your account.");
+                            break;
+                        }
+                    } catch (_) { /* ignore lookup errors */ }
                     setAuthError("Invalid email or password.");
                     break;
-                case "auth/user-not-found":
-                    setAuthError("No account found with this email.");
-                    break;
-                case "auth/wrong-password":
-                    setAuthError("Incorrect password.");
-                    break;
+                }
                 default:
                     setAuthError(error.message);
             }
