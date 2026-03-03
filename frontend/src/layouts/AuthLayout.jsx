@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { auth } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, browserSessionPersistence, setPersistence, fetchSignInMethodsForEmail } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, browserSessionPersistence, setPersistence, fetchSignInMethodsForEmail, sendPasswordResetEmail } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useState, useEffect } from "react";
 
@@ -94,8 +94,9 @@ const registerDetails = {
 
 export default function AuthLayout({ isLogin = true }) {
     const details = isLogin ? loginDetails : registerDetails;
-    const { register, handleSubmit, watch, formState: { errors } } = useForm();
+    const { register, handleSubmit, watch, getValues, formState: { errors } } = useForm();
     const [authError, setAuthError] = useState(null);
+    const [authMessage, setAuthMessage] = useState(null);
     const [loading, setLoading] = useState(false);
     const [user, authLoading] = useAuthState(auth);
     const navigate = useNavigate();
@@ -107,6 +108,7 @@ export default function AuthLayout({ isLogin = true }) {
 
     const onSubmit = async (data) => {
         setAuthError(null);
+        setAuthMessage(null);
         setLoading(true);
 
         try {
@@ -150,6 +152,7 @@ export default function AuthLayout({ isLogin = true }) {
 
     const handleGoogleSignIn = async () => {
         setAuthError(null);
+        setAuthMessage(null);
         setLoading(true);
         try {
             const provider = new GoogleAuthProvider();
@@ -159,6 +162,29 @@ export default function AuthLayout({ isLogin = true }) {
             setAuthError(error.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async () => {
+        const email = getValues("email")?.trim();
+
+        setAuthError(null);
+        setAuthMessage(null);
+
+        if (!email) {
+            setAuthError("Please enter your email first, then click Forgot your password?");
+            return;
+        }
+
+        try {
+            await sendPasswordResetEmail(auth, email);
+            setAuthMessage("Password reset email sent. Please check your inbox.");
+        } catch (error) {
+            if (error.code === "auth/invalid-email") {
+                setAuthError("Please enter a valid email address.");
+                return;
+            }
+            setAuthError("Could not send reset email. Please try again.");
         }
     };
 
@@ -210,6 +236,16 @@ export default function AuthLayout({ isLogin = true }) {
                             {errors.agreeTerms && (
                                 <p className="text-red-500 text-xs">{errors.agreeTerms.message}</p>
                             )}
+
+                            {isLogin && (
+                                <button
+                                    type="button"
+                                    onClick={handleForgotPassword}
+                                    className="w-fit text-sm text-[rgb(108,144,46)] hover:underline mt-2 cursor-pointer"
+                                >
+                                    Forgot your password?
+                                </button>
+                            )}
                         </div>
 
                         <button type="submit" disabled={loading} className="bg-[rgb(108,144,46)]/80 hover:bg-[rgb(108,144,46)] cursor-pointer text-white py-2 rounded-md transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -220,13 +256,22 @@ export default function AuthLayout({ isLogin = true }) {
                     {authError && (
                         <p className="text-red-500 text-sm text-center mt-3">{authError}</p>
                     )}
+                    {authMessage && (
+                        <p className="text-green-600 text-sm text-center mt-3">{authMessage}</p>
+                    )}
 
                     <h1 className="text-center mt-5">OR</h1>
                     <button
                         onClick={handleGoogleSignIn}
                         disabled={loading}
-                        className="bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300 transition duration-200 mt-5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        className="bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300 transition duration-200 mt-5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                     >
+                        <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
+                            <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.193 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.955 3.045l5.657-5.657C34.046 6.053 29.27 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"/>
+                            <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.955 3.045l5.657-5.657C34.046 6.053 29.27 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                            <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.153 35.091 26.715 36 24 36c-5.172 0-9.619-3.321-11.283-7.946l-6.52 5.025C9.505 39.556 16.227 44 24 44z"/>
+                            <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.05 12.05 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z"/>
+                        </svg>
                         Sign In with Google
                     </button>
 
