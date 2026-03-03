@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
 
 function ProtectedRootLayout() {
   const [user, loading] = useAuthState(auth);
@@ -30,6 +31,7 @@ function App() {
       {/* Protected Routes, i.e. only logged in users can access */}
       <Route element={<ProtectedRootLayout />}>
         <Route path="/dashboard/*" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
 
         <Route path="*" element={<NotFound />} />
       </Route>
