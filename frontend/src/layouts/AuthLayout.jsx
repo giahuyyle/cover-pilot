@@ -1,4 +1,9 @@
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router";
+import { auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, browserSessionPersistence, setPersistence } from "firebase/auth";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { useState, useEffect } from "react";
 
 const loginDetails = {
     text: "Welcome back!",
@@ -90,9 +95,66 @@ const registerDetails = {
 export default function AuthLayout({ isLogin = true }) {
     const details = isLogin ? loginDetails : registerDetails;
     const { register, handleSubmit, watch, formState: { errors } } = useForm();
+    const [authError, setAuthError] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [user, authLoading] = useAuthState(auth);
+    const navigate = useNavigate();
 
-    const onSubmit = (data) => {
-        console.log(data);
+    // Redirect to dashboard if already signed in
+    useEffect(() => {
+        if (user) navigate("/dashboard");
+    }, [user, navigate]);
+
+    const onSubmit = async (data) => {
+        setAuthError(null);
+        setLoading(true);
+
+        try {
+            if (isLogin) {
+                // "Remember for 30 days" = local persistence (survives browser close)
+                // Otherwise = session persistence (cleared when tab closes)
+                const persistence = data.rememberMe ? browserLocalPersistence : browserSessionPersistence;
+                await setPersistence(auth, persistence);
+                await signInWithEmailAndPassword(auth, data.email, data.password);
+            } else {
+                const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+                await updateProfile(userCredential.user, { displayName: data.fullName });
+            }
+            navigate("/dashboard");
+        } catch (error) {
+            switch (error.code) {
+                case "auth/email-already-in-use":
+                    setAuthError("This email is already registered.");
+                    break;
+                case "auth/invalid-credential":
+                    setAuthError("Invalid email or password.");
+                    break;
+                case "auth/user-not-found":
+                    setAuthError("No account found with this email.");
+                    break;
+                case "auth/wrong-password":
+                    setAuthError("Incorrect password.");
+                    break;
+                default:
+                    setAuthError(error.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        setAuthError(null);
+        setLoading(true);
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+            navigate("/dashboard");
+        } catch (error) {
+            setAuthError(error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -133,9 +195,9 @@ export default function AuthLayout({ isLogin = true }) {
                                     type="checkbox"
                                     id="checkbox"
                                     className="h-4 w-4 focus:ring-[rgb(108,144,46)] border-gray-300 rounded"
-                                    {...(!isLogin
-                                        ? register("agreeTerms", { required: "You must agree to the Terms of Service and Privacy Policy" })
-                                        : {}
+                                    {...(isLogin
+                                        ? register("rememberMe")
+                                        : register("agreeTerms", { required: "You must agree to the Terms of Service and Privacy Policy" })
                                     )}
                                 />
                                 <label htmlFor="checkbox" className="text-sm">{details.checkbox}</label>
@@ -145,13 +207,21 @@ export default function AuthLayout({ isLogin = true }) {
                             )}
                         </div>
 
-                        <button type="submit" className="bg-[rgb(108,144,46)]/80 hover:bg-[rgb(108,144,46)] cursor-pointer text-white py-2 rounded-md  transition duration-200">
-                            {isLogin ? "Login" : "Sign Up"}
+                        <button type="submit" disabled={loading} className="bg-[rgb(108,144,46)]/80 hover:bg-[rgb(108,144,46)] cursor-pointer text-white py-2 rounded-md transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                            {loading ? "Please wait..." : (isLogin ? "Login" : "Sign Up")}
                         </button>
                     </form>
 
+                    {authError && (
+                        <p className="text-red-500 text-sm text-center mt-3">{authError}</p>
+                    )}
+
                     <h1 className="text-center mt-5">OR</h1>
-                    <button className="bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300 transition duration-200 mt-5">
+                    <button
+                        onClick={handleGoogleSignIn}
+                        disabled={loading}
+                        className="bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300 transition duration-200 mt-5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
                         Sign In with Google
                     </button>
 
