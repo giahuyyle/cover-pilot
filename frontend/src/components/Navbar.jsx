@@ -46,7 +46,7 @@ export default function Navbar() {
 			<nav
 				className="flex items-center gap-3 px-4 py-3"
 				style={{
-					background: "rgba(255, 255, 255, 0.36)",
+					background: "rgba(186, 196, 200, 0.15)",
 					borderRadius: "16px",
 					boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
 					backdropFilter: "blur(11.9px)",
