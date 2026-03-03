@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
 import { Search, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,45 @@ export default function Profile() {
 
     const handleChange = (field, value) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
+    };
+
+    // Change password form
+    const {
+        register,
+        handleSubmit,
+        watch,
+        reset,
+        formState: { errors: pwErrors },
+    } = useForm();
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwError, setPwError] = useState(null);
+    const [pwSuccess, setPwSuccess] = useState(null);
+
+    const onChangePassword = async (data) => {
+        setPwError(null);
+        setPwSuccess(null);
+        setPwLoading(true);
+        try {
+            const credential = EmailAuthProvider.credential(user.email, data.currentPassword);
+            await reauthenticateWithCredential(user, credential);
+            await updatePassword(user, data.newPassword);
+            setPwSuccess("Password updated successfully.");
+            reset();
+        } catch (error) {
+            switch (error.code) {
+                case "auth/wrong-password":
+                case "auth/invalid-credential":
+                    setPwError("Current password is incorrect.");
+                    break;
+                case "auth/requires-recent-login":
+                    setPwError("Please log out and log back in before changing your password.");
+                    break;
+                default:
+                    setPwError(error.message);
+            }
+        } finally {
+            setPwLoading(false);
+        }
     };
 
     if (loading) {
@@ -162,6 +203,88 @@ export default function Profile() {
                         <p className="text-xs text-muted-foreground">Primary E-mail</p>
                     </div>
                 </div>
+            </div>
+
+            {/* Change Password */}
+            <div className="mt-10">
+                <h3 className="text-lg font-semibold text-foreground mb-4">
+                    Change Password
+                </h3>
+                <form
+                    onSubmit={handleSubmit(onChangePassword)}
+                    className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 max-w-3xl"
+                >
+                    {/* Current Password - full width */}
+                    <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="currentPassword">Enter Current Password</Label>
+                        <Input
+                            id="currentPassword"
+                            type="password"
+                            placeholder="Enter your current password"
+                            {...register("currentPassword", {
+                                required: "Current password is required",
+                            })}
+                        />
+                        {pwErrors.currentPassword && (
+                            <p className="text-red-500 text-xs">{pwErrors.currentPassword.message}</p>
+                        )}
+                    </div>
+
+                    {/* New Password */}
+                    <div className="space-y-2">
+                        <Label htmlFor="newPassword">Enter New Password</Label>
+                        <Input
+                            id="newPassword"
+                            type="password"
+                            placeholder="Enter new password"
+                            {...register("newPassword", {
+                                required: "Password is required",
+                                minLength: {
+                                    value: 8,
+                                    message: "Password must be at least 8 characters",
+                                },
+                                pattern: {
+                                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+                                    message: "Must include uppercase, lowercase, a number, and a special character",
+                                },
+                            })}
+                        />
+                        {pwErrors.newPassword && (
+                            <p className="text-red-500 text-xs">{pwErrors.newPassword.message}</p>
+                        )}
+                    </div>
+
+                    {/* Re-enter New Password */}
+                    <div className="space-y-2">
+                        <Label htmlFor="confirmNewPassword">Re-enter New Password</Label>
+                        <Input
+                            id="confirmNewPassword"
+                            type="password"
+                            placeholder="Re-enter new password"
+                            {...register("confirmNewPassword", {
+                                required: "Please confirm your new password",
+                                validate: (value) =>
+                                    value === watch("newPassword") || "Passwords do not match",
+                            })}
+                        />
+                        {pwErrors.confirmNewPassword && (
+                            <p className="text-red-500 text-xs">{pwErrors.confirmNewPassword.message}</p>
+                        )}
+                    </div>
+
+                    {/* Submit + feedback */}
+                    <div className="md:col-span-2 flex flex-col gap-2">
+                        <Button
+                            type="submit"
+                            disabled={pwLoading}
+                            className="w-fit rounded-lg px-6"
+                        >
+                            {pwLoading ? "Updating..." : "Change Password"}
+                        </Button>
+                        {pwError && <p className="text-red-500 text-sm">{pwError}</p>}
+                        {pwSuccess && <p className="text-green-600 text-sm">{pwSuccess}</p>}
+                    </div>
+                </form>
             </div>
         </div>
     );
