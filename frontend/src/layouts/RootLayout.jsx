@@ -8,7 +8,7 @@ export default function RootLayout() {
       <Navbar />
 
       {/* Outlet is to render the children element */}
-      <main className="min-h-screen pt-33">
+      <main className="min-h-screen pt-40 ">
         <Outlet />
       </main>
 

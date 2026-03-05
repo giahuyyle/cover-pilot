@@ -42,33 +42,40 @@ export default function Navbar() {
 	};
 
 	return (
-		<header className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-			<nav
-				className="flex items-center gap-3 px-4 py-3"
-				style={{
-					background: "rgba(186, 196, 200, 0.15)",
-					borderRadius: "16px",
-					boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-					backdropFilter: "blur(11.9px)",
-					WebkitBackdropFilter: "blur(11.9px)",
-					border: "1px solid rgba(255, 255, 255, 1)",
-				}}
-			>
-				{mainItems.map(renderItem)}
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-start justify-between px-4 pt-4">
+            <Link to="/dashboard">
+                <img src="/logo.svg" alt="logo" className="h-20 w-20 rounded-md" />
+            </Link>
 
-				{/* Divider */}
-				<div className="h-12 w-px bg-zinc-300" />
+            <header>
+                <nav
+                    className="flex items-center gap-3 px-4 py-3"
+                    style={{
+                        background: "rgba(186, 196, 200, 0.15)",
+                        borderRadius: "16px",
+                        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
+                        backdropFilter: "blur(11.9px)",
+                        WebkitBackdropFilter: "blur(11.9px)",
+                        border: "1px solid rgba(255, 255, 255, 1)",
+                    }}
+                >
+                    {mainItems.map(renderItem)}
 
-				{rightItems.map(renderItem)}
+                    {/* Divider */}
+                    <div className="h-12 w-px bg-zinc-300" />
 
-				{/* Logout button */}
-				<button onClick={handleLogout} className="flex flex-col items-center gap-1.5 cursor-pointer">
-					<div className="flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition bg-white/80 hover:bg-red-100">
-						<LogOut className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
-					</div>
-					<span className="text-xs text-zinc-700">Logout</span>
-				</button>
-			</nav>
-		</header>
+                    {rightItems.map(renderItem)}
+
+                    {/* Logout button */}
+                    <button onClick={handleLogout} className="flex flex-col items-center gap-1.5 cursor-pointer">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition bg-white/80 hover:bg-red-100">
+                            <LogOut className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
+                        </div>
+                        <span className="text-xs text-zinc-700">Logout</span>
+                    </button>
+                </nav>
+            </header>
+        </div>
+		
 	);
 }

@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import TemplateMarket from "./pages/TemplateMarket";
 
 function ProtectedRootLayout() {
   const [user, loading] = useAuthState(auth);
@@ -31,6 +32,7 @@ function App() {
       {/* Protected Routes, i.e. only logged in users can access */}
       <Route element={<ProtectedRootLayout />}>
         <Route path="/dashboard/*" element={<Dashboard />} />
+        <Route path="/templates" element={<TemplateMarket />} />
         <Route path="/profile" element={<Profile />} />
 
         <Route path="*" element={<NotFound />} />
