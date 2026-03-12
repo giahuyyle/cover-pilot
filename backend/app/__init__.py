@@ -1,19 +1,36 @@
+import os
+
 from flask import Flask
-from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials
 
+from .extensions import cors, db
+from .routes import register_blueprints
+from .utils.errors import register_error_handlers
 
-def create_app(config_object="config.Config"):
+
+def create_app(config_object="config.DevelopmentConfig"):
     app = Flask(__name__)
     app.config.from_object(config_object)
-    CORS(app)
 
-    # Initialize Firebase Admin SDK
-    cred = credentials.Certificate("serviceAccountKey.json")
-    firebase_admin.initialize_app(cred)
+    # Extensions
+    cors.init_app(app)
+    db.init_app(app)
 
-    from .routes import bp as main_bp
-    app.register_blueprint(main_bp)
+    # Firebase Admin SDK (skip in testing)
+    if not firebase_admin._apps:
+        cred_path = app.config.get("FIREBASE_CREDENTIALS", "serviceAccountKey.json")
+        if os.path.exists(cred_path):
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+
+    # Create SQL tables
+    with app.app_context():
+        from . import models  # noqa: F401 — ensure models are imported
+        db.create_all()
+
+    # Blueprints & error handlers
+    register_blueprints(app)
+    register_error_handlers(app)
 
     return app

@@ -41,3 +41,6 @@ Thumbs.db
 
 # Firebase service account keys
 serviceAccountKey.json
+
+# Local Database files
+*.db
