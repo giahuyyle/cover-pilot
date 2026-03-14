@@ -4,13 +4,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import RootLayout from "./layouts/RootLayout";
 import { auth } from "./lib/firebase";
 
-import NotFound from "./pages/NotFound";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Dashboard from "./pages/Dashboard";
-import Profile from "./pages/Profile";
-import TemplateMarket from "./pages/TemplateMarket";
+import { Dashboard, Editor, Landing, Login, NotFound, Profile, Signup, TemplateMarket } from "./pages";
 
 function ProtectedRootLayout() {
   const [user, loading] = useAuthState(auth);
@@ -34,6 +28,7 @@ function App() {
         <Route path="/dashboard/*" element={<Dashboard />} />
         <Route path="/templates" element={<TemplateMarket />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/editor/*" element={<Editor />} />
 
         <Route path="*" element={<NotFound />} />
       </Route>
