@@ -77,10 +77,81 @@ const pdfStyles = StyleSheet.create({
   skillsLabel: {
     fontFamily: "Times-Bold",
   },
+  inlineBold: {
+    fontFamily: "Times-Bold",
+  },
+  inlineItalic: {
+    fontFamily: "Times-Italic",
+  },
+  inlineUnderline: {
+    textDecoration: "underline",
+  },
 });
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function toPreviewText(value) {
+  return normalizeText(value)
+    .replace(/\\textbackslash\{\}/g, "\\")
+    .replace(/\\&/g, "&")
+    .replace(/\\%/g, "%")
+    .replace(/\\\$/g, "$")
+    .replace(/\\#/g, "#")
+    .replace(/\\_/g, "_")
+    .replace(/\\\{/g, "{")
+    .replace(/\\\}/g, "}")
+    .replace(/\\textasciitilde\{\}/g, "~")
+    .replace(/\\textasciicircum\{\}/g, "^");
+}
+
+function parseInlineLatexSegments(value) {
+  const text = toPreviewText(value);
+  const segments = [];
+  const regex = /\\(emph|textit|textbf|underline)\{([^{}]*)\}/g;
+  let cursor = 0;
+  let match = regex.exec(text);
+
+  while (match) {
+    if (match.index > cursor) {
+      segments.push({ kind: "plain", text: text.slice(cursor, match.index) });
+    }
+
+    segments.push({ kind: match[1], text: match[2] });
+    cursor = match.index + match[0].length;
+    match = regex.exec(text);
+  }
+
+  if (cursor < text.length) {
+    segments.push({ kind: "plain", text: text.slice(cursor) });
+  }
+
+  return segments.length ? segments : [{ kind: "plain", text }];
+}
+
+function inlineStyleFor(kind) {
+  if (kind === "emph" || kind === "textit") {
+    return pdfStyles.inlineItalic;
+  }
+
+  if (kind === "textbf") {
+    return pdfStyles.inlineBold;
+  }
+
+  if (kind === "underline") {
+    return pdfStyles.inlineUnderline;
+  }
+
+  return undefined;
+}
+
+function renderInlineLatex(value, keyPrefix) {
+  return parseInlineLatexSegments(value).map((segment, index) => (
+    <Text key={`${keyPrefix}-${index}`} style={inlineStyleFor(segment.kind)}>
+      {segment.text}
+    </Text>
+  ));
 }
 
 function toRenderModel(formState) {
@@ -89,21 +160,43 @@ function toRenderModel(formState) {
 
   return {
     heading: {
-      name: normalizeText(heading.name) || "Your Name",
-      phone: normalizeText(heading.phone),
-      email: normalizeText(heading.email),
-      location: normalizeText(heading.location),
-      linkedin: normalizeText(heading.linkedin),
-      github: normalizeText(heading.github),
+      name: toPreviewText(heading.name) || "Your Name",
+      phone: toPreviewText(heading.phone),
+      email: toPreviewText(heading.email),
+      location: toPreviewText(heading.location),
+      linkedin: toPreviewText(heading.linkedin),
+      github: toPreviewText(heading.github),
     },
-    education: Array.isArray(formState?.education) ? formState.education : [],
-    experience: Array.isArray(formState?.experience) ? formState.experience : [],
-    projects: Array.isArray(formState?.projects) ? formState.projects : [],
+    education: Array.isArray(formState?.education)
+      ? formState.education.map((item) => ({
+          school: toPreviewText(item.school),
+          location: toPreviewText(item.location),
+          degree: toPreviewText(item.degree),
+          gradDate: toPreviewText(item.gradDate),
+        }))
+      : [],
+    experience: Array.isArray(formState?.experience)
+      ? formState.experience.map((item) => ({
+          role: toPreviewText(item.role),
+          company: toPreviewText(item.company),
+          location: toPreviewText(item.location),
+          date: toPreviewText(item.date),
+          bullets: Array.isArray(item.bullets) ? item.bullets.map((bullet) => toPreviewText(bullet)) : [],
+        }))
+      : [],
+    projects: Array.isArray(formState?.projects)
+      ? formState.projects.map((item) => ({
+          title: toPreviewText(item.title),
+          technologies: toPreviewText(item.technologies),
+          date: toPreviewText(item.date),
+          bullets: Array.isArray(item.bullets) ? item.bullets.map((bullet) => toPreviewText(bullet)) : [],
+        }))
+      : [],
     technicalSkills: {
-      languages: normalizeText(skills.languages),
-      frameworks: normalizeText(skills.frameworks),
-      tools: normalizeText(skills.tools),
-      libraries: normalizeText(skills.libraries),
+      languages: toPreviewText(skills.languages),
+      frameworks: toPreviewText(skills.frameworks),
+      tools: toPreviewText(skills.tools),
+      libraries: toPreviewText(skills.libraries),
     },
   };
 }
@@ -128,12 +221,12 @@ function RenderPreviewDocument({ resume }) {
           {resume.education.map((item, index) => (
             <View key={`edu-${index}`} style={pdfStyles.row}>
               <View style={pdfStyles.rowTop}>
-                <Text style={pdfStyles.primaryText}>{item.school || "School"}</Text>
-                <Text style={pdfStyles.secondaryText}>{item.gradDate || "Date"}</Text>
+                <Text style={pdfStyles.primaryText}>{renderInlineLatex(item.school || "School", `edu-school-${index}`)}</Text>
+                <Text style={pdfStyles.secondaryText}>{renderInlineLatex(item.gradDate || "Date", `edu-date-${index}`)}</Text>
               </View>
               <View style={pdfStyles.rowTop}>
-                <Text style={pdfStyles.italicText}>{item.degree || "Degree"}</Text>
-                <Text style={pdfStyles.secondaryText}>{item.location || "Location"}</Text>
+                <Text style={pdfStyles.italicText}>{renderInlineLatex(item.degree || "Degree", `edu-degree-${index}`)}</Text>
+                <Text style={pdfStyles.secondaryText}>{renderInlineLatex(item.location || "Location", `edu-location-${index}`)}</Text>
               </View>
             </View>
           ))}
@@ -144,16 +237,16 @@ function RenderPreviewDocument({ resume }) {
           {resume.experience.map((item, index) => (
             <View key={`exp-${index}`} style={pdfStyles.row}>
               <View style={pdfStyles.rowTop}>
-                <Text style={pdfStyles.primaryText}>{item.role || "Role"}</Text>
-                <Text style={pdfStyles.secondaryText}>{item.date || "Date"}</Text>
+                <Text style={pdfStyles.primaryText}>{renderInlineLatex(item.role || "Role", `exp-role-${index}`)}</Text>
+                <Text style={pdfStyles.secondaryText}>{renderInlineLatex(item.date || "Date", `exp-date-${index}`)}</Text>
               </View>
               <View style={pdfStyles.rowTop}>
-                <Text style={pdfStyles.italicText}>{item.company || "Company"}</Text>
-                <Text style={pdfStyles.secondaryText}>{item.location || "Location"}</Text>
+                <Text style={pdfStyles.italicText}>{renderInlineLatex(item.company || "Company", `exp-company-${index}`)}</Text>
+                <Text style={pdfStyles.secondaryText}>{renderInlineLatex(item.location || "Location", `exp-location-${index}`)}</Text>
               </View>
               {(Array.isArray(item.bullets) ? item.bullets : []).filter(Boolean).map((bullet, bulletIndex) => (
                 <Text key={`exp-b-${index}-${bulletIndex}`} style={pdfStyles.bullet}>
-                  • {bullet}
+                  • {renderInlineLatex(bullet, `exp-bullet-${index}-${bulletIndex}`)}
                 </Text>
               ))}
             </View>
@@ -165,13 +258,13 @@ function RenderPreviewDocument({ resume }) {
           {resume.projects.map((item, index) => (
             <View key={`proj-${index}`} style={pdfStyles.row}>
               <View style={pdfStyles.rowTop}>
-                <Text style={pdfStyles.primaryText}>{item.title || "Project"}</Text>
-                <Text style={pdfStyles.secondaryText}>{item.date || "Date"}</Text>
+                <Text style={pdfStyles.primaryText}>{renderInlineLatex(item.title || "Project", `proj-title-${index}`)}</Text>
+                <Text style={pdfStyles.secondaryText}>{renderInlineLatex(item.date || "Date", `proj-date-${index}`)}</Text>
               </View>
-              {item.technologies ? <Text style={pdfStyles.italicText}>{item.technologies}</Text> : null}
+              {item.technologies ? <Text style={pdfStyles.italicText}>{renderInlineLatex(item.technologies, `proj-tech-${index}`)}</Text> : null}
               {(Array.isArray(item.bullets) ? item.bullets : []).filter(Boolean).map((bullet, bulletIndex) => (
                 <Text key={`proj-b-${index}-${bulletIndex}`} style={pdfStyles.bullet}>
-                  • {bullet}
+                  • {renderInlineLatex(bullet, `proj-bullet-${index}-${bulletIndex}`)}
                 </Text>
               ))}
             </View>
