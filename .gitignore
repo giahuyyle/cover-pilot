@@ -1,1 +1,9 @@
 .idea/
+.claude/
+.claude_cache/
+*.txt
+*.log
+*.csv
+*.json
+*.xml
+*.pdf
