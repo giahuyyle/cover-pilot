@@ -23,9 +23,11 @@ def create_user_profile(uid: str, email: str, display_name: str = "") -> dict:
     return user.to_dict()
 
 
-def update_user_profile(uid: str, data: dict) -> dict:
-    allowed_fields = {"display_name", "photo_url", "bio"}
+def update_user_profile(uid: str, data: dict, email: str | None = None) -> dict:
+    allowed_fields = {"display_name", "photo_url", "bio", "email"}
     updates = {k: v for k, v in data.items() if k in allowed_fields}
+    if email:
+        updates["email"] = email
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _users_ref().document(uid).update(updates)
+    _users_ref().document(uid).set({"uid": uid, **updates}, merge=True)
     return {**updates, "uid": uid}

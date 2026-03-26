@@ -18,5 +18,7 @@ class ProfileView(APIView):
 
     def put(self, request):
         uid = request.user["uid"]
-        updated = update_user_profile(uid, request.data)
+        email = request.user.get("email", "")
+        updated = update_user_profile(uid, request.data, email=email)
         return Response(updated)
+    

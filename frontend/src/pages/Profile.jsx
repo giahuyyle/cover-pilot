@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { auth } from "@/lib/firebase";
+import { apiFetch } from "@/lib/api";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
 import { Search, Bell } from "lucide-react";
@@ -11,6 +12,13 @@ import { Label } from "@/components/ui/label";
 export default function Profile() {
     const [user, loading] = useAuthState(auth);
     const [isEditing, setIsEditing] = useState(false);
+    const [backendProfile, setBackendProfile] = useState(null);
+    const [backendLoading, setBackendLoading] = useState(false);
+    const [backendError, setBackendError] = useState("");
+
+    const isHtmlError =
+        typeof backendError === "string" &&
+        /<\s*!doctype\s+html|<\s*html[\s>]/i.test(backendError);
 
     const displayName = user?.displayName || "User";
     const firstName = displayName.split(" ")[0];
@@ -33,6 +41,43 @@ export default function Profile() {
     const handleChange = (field, value) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
+
+    useEffect(() => {
+        if (!user) {
+            setBackendProfile(null);
+            setBackendError("");
+            setBackendLoading(false);
+            return;
+        }
+
+        let isMounted = true;
+
+        const fetchBackendProfile = async () => {
+            setBackendLoading(true);
+            setBackendError("");
+
+            try {
+                const data = await apiFetch("/api/users/me/");
+                if (isMounted) {
+                    setBackendProfile(data);
+                }
+            } catch (error) {
+                if (isMounted) {
+                    setBackendError(error.message || "Failed to load backend profile.");
+                }
+            } finally {
+                if (isMounted) {
+                    setBackendLoading(false);
+                }
+            }
+        };
+
+        fetchBackendProfile();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [user]);
 
     // Change password form
     const {
@@ -205,6 +250,55 @@ export default function Profile() {
                 </div>
             </div>
 
+            {/* Backend profile */}
+            <div className="mt-10">
+                <h3 className="text-lg font-semibold text-foreground mb-4">
+                    Backend Profile (/api/users/me)
+                </h3>
+
+                <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+                    {backendLoading && (
+                        <p className="text-sm text-muted-foreground">Loading backend profile...</p>
+                    )}
+
+                    {!backendLoading && backendError && (
+                        <div className="space-y-3">
+                            <p className="text-sm text-red-500">Backend returned an HTML error page.</p>
+                            {isHtmlError ? (
+                                <iframe
+                                    title="backend-html-error"
+                                    srcDoc={backendError}
+                                    className="w-full min-h-105 rounded-md border border-border bg-background"
+                                    sandbox="allow-same-origin"
+                                />
+                            ) : (
+                                <p className="text-sm text-red-500 whitespace-pre-wrap wrap-break-word">{backendError}</p>
+                            )}
+                        </div>
+                    )}
+
+                    {!backendLoading && !backendError && backendProfile && (
+                        <div className="space-y-1">
+                            <p className="text-sm text-foreground">
+                                <span className="font-medium">Display name:</span>{" "}
+                                {backendProfile.display_name || "-"}
+                            </p>
+                            <p className="text-sm text-foreground">
+                                <span className="font-medium">Bio:</span> {backendProfile.bio || "-"}
+                            </p>
+                            <p className="text-sm text-foreground break-all">
+                                <span className="font-medium">Photo URL:</span>{" "}
+                                {backendProfile.photo_url || "-"}
+                            </p>
+                        </div>
+                    )}
+
+                    {!backendLoading && !backendError && !backendProfile && (
+                        <p className="text-sm text-muted-foreground">No backend profile data found.</p>
+                    )}
+                </div>
+            </div>
+
             {/* Change Password */}
             <div className="mt-10">
                 <h3 className="text-lg font-semibold text-foreground mb-4">
@@ -244,7 +338,7 @@ export default function Profile() {
                                     message: "Password must be at least 8 characters",
                                 },
                                 pattern: {
-                                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+                                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?])/,
                                     message: "Must include uppercase, lowercase, a number, and a special character",
                                 },
                             })}

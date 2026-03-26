@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { auth } from "@/lib/firebase";
+import { apiFetch } from "@/lib/api";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, browserSessionPersistence, setPersistence, fetchSignInMethodsForEmail, sendPasswordResetEmail } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useState, useEffect } from "react";
@@ -73,7 +74,7 @@ const registerDetails = {
                 required: "Password is required",
                 minLength: { value: 8, message: "Password must be at least 8 characters" },
                 pattern: {
-                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s])/,
                     message: "Must include uppercase, lowercase, a number, and a special character",
                 },
             },
@@ -98,13 +99,30 @@ export default function AuthLayout({ isLogin = true }) {
     const [authError, setAuthError] = useState(null);
     const [authMessage, setAuthMessage] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [user, authLoading] = useAuthState(auth);
+    const [user] = useAuthState(auth);
     const navigate = useNavigate();
 
     // Redirect to dashboard if already signed in
     useEffect(() => {
         if (user) navigate("/dashboard");
     }, [user, navigate]);
+
+    const syncUserProfileToBackend = async (firebaseUser) => {
+        if (!firebaseUser) return;
+
+        try {
+            await apiFetch("/api/users/me/", {
+                method: "PUT",
+                body: JSON.stringify({
+                    display_name: firebaseUser.displayName || "",
+                    photo_url: firebaseUser.photoURL || "",
+                }),
+            });
+        } catch (error) {
+            // Do not block login/signup when profile sync fails.
+            console.error("Failed to sync user profile to backend:", error);
+        }
+    };
 
     const onSubmit = async (data) => {
         setAuthError(null);
@@ -117,10 +135,12 @@ export default function AuthLayout({ isLogin = true }) {
                 // Otherwise = session persistence (cleared when tab closes)
                 const persistence = data.rememberMe ? browserLocalPersistence : browserSessionPersistence;
                 await setPersistence(auth, persistence);
-                await signInWithEmailAndPassword(auth, data.email, data.password);
+                const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+                await syncUserProfileToBackend(userCredential.user);
             } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
                 await updateProfile(userCredential.user, { displayName: data.fullName });
+                await syncUserProfileToBackend(userCredential.user);
             }
             navigate("/dashboard");
         } catch (error) {
@@ -138,7 +158,7 @@ export default function AuthLayout({ isLogin = true }) {
                             setAuthError("This account was signed up via Google. Please use the Sign In with Google button below to access your account.");
                             break;
                         }
-                    } catch (_) { /* ignore lookup errors */ }
+                    } catch { /* ignore lookup errors */ }
                     setAuthError("Invalid email or password.");
                     break;
                 }
@@ -156,7 +176,8 @@ export default function AuthLayout({ isLogin = true }) {
         setLoading(true);
         try {
             const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
+            const result = await signInWithPopup(auth, provider);
+            await syncUserProfileToBackend(result.user);
             navigate("/dashboard");
         } catch (error) {
             setAuthError(error.message);
