@@ -7,3 +7,5 @@
 *.json
 *.xml
 *.pdf
+.codex/
+.vscode/

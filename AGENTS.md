@@ -1,5 +1,8 @@
 # Repository Guidelines
 
+## General Instructions
+- ALWAYS run "npm run lint" after making changes in the frontend folder => fix any linting errors
+
 ## Project Structure & Module Organization
 - Root: `backend/` (Django REST API), `frontend/` (Vite + React UI).
 - Backend:
