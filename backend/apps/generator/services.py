@@ -42,7 +42,7 @@ def generate_latex_resume(
     )
 
     message = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-haiku-4-5",
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
