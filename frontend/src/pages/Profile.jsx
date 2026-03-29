@@ -338,7 +338,7 @@ export default function Profile() {
                                     message: "Password must be at least 8 characters",
                                 },
                                 pattern: {
-                                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?])/,
+                                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/,
                                     message: "Must include uppercase, lowercase, a number, and a special character",
                                 },
                             })}
