@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 import uuid
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,8 +10,26 @@ from django.conf import settings
 from firebase_admin import firestore
 
 
+def _resolve_pdflatex() -> str:
+    """Find a usable pdflatex executable path."""
+    pdflatex = shutil.which("pdflatex")
+    if pdflatex:
+        return pdflatex
+
+    # Default MacTeX binary location on macOS.
+    fallback = Path("/Library/TeX/texbin/pdflatex")
+    if fallback.exists():
+        return str(fallback)
+
+    raise FileNotFoundError(
+        "pdflatex is not installed or not on PATH. Install a TeX distribution (e.g. MacTeX) and retry."
+    )
+
+
 def _compile_latex_to_pdf(latex: str) -> bytes:
     """Compile a LaTeX string to PDF bytes using pdflatex."""
+    pdflatex = _resolve_pdflatex()
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tex_path = Path(tmpdir) / "resume.tex"
         pdf_path = Path(tmpdir) / "resume.pdf"
@@ -18,7 +37,7 @@ def _compile_latex_to_pdf(latex: str) -> bytes:
         tex_path.write_text(latex, encoding="utf-8")
 
         result = subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmpdir, str(tex_path)],
+            [pdflatex, "-interaction=nonstopmode", "-output-directory", tmpdir, str(tex_path)],
             capture_output=True,
             text=True,
         )
@@ -59,7 +78,7 @@ def save_to_s3_temp(latex: str, template: str) -> str:
     return url
 
 
-def save_to_firestore(uid: str, latex: str, template: str) -> str:
+def save_to_firestore(uid: str, latex: str, template: str) -> tuple[str, str]:
     """Compile LaTeX to PDF, upload to S3 users/, save metadata to Firestore. Returns doc ID."""
     pdf_bytes = _compile_latex_to_pdf(latex)
 
