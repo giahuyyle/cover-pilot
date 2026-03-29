@@ -24,7 +24,7 @@
 
 ## Coding Style & Naming Conventions
 - Python (backend): 4‑space indent, snake_case for functions/modules, PascalCase for classes. Keep app boundaries (`apps/users`, `apps/generator`) clean; reusable code in `core/`.
-- JavaScript/React (frontend): ESLint enforced. Components and page files use PascalCase (e.g., `Navbar.jsx`, `TemplateMarket.jsx`). Utilities in `src/lib/` use camelCase.
+- JavaScript/React (frontend): 4‑space indentation across React/JS files; ESLint enforced. Components and page files use PascalCase (e.g., `Navbar.jsx`, `TemplateMarket.jsx`). Utilities in `src/lib/` use camelCase.
 - API: Add endpoints under app `views.py` + `urls.py`; register in `config/urls.py` via app `urls`.
 
 ## Testing Guidelines
@@ -43,4 +43,3 @@
 - Never commit secrets. Configure `.env` in `backend/` (`SECRET_KEY`, `FIREBASE_CREDENTIALS`, `AI_API_KEY`) and `.env` in `frontend/` for client config.
 - Keep `serviceAccountKey.json` local; reference via `FIREBASE_CREDENTIALS`.
 - CORS and auth live in `config/settings.py` and `core/auth.py`—update thoughtfully when exposing new routes.
-

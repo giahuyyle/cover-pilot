@@ -11,34 +11,36 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import TemplateMarket from "./pages/TemplateMarket";
+import Generator from "./pages/Generator";
 
 function ProtectedRootLayout() {
-  const [user, loading] = useAuthState(auth);
+    const [user, loading] = useAuthState(auth);
 
-  if (loading) return null;
-  if (!user) return <Navigate to="/" replace />;
+    if (loading) return null;
+    if (!user) return <Navigate to="/" replace />;
 
-  return <RootLayout />;
+    return <RootLayout />;
 }
 
 function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
+    return (
+        <Routes>
+            <Route path="/" element={<Landing />} />
 
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
 
-      {/* Protected Routes, i.e. only logged in users can access */}
-      <Route element={<ProtectedRootLayout />}>
-        <Route path="/dashboard/*" element={<Dashboard />} />
-        <Route path="/templates" element={<TemplateMarket />} />
-        <Route path="/profile" element={<Profile />} />
+            {/* Protected Routes, i.e. only logged in users can access */}
+            <Route element={<ProtectedRootLayout />}>
+                <Route path="/dashboard/*" element={<Dashboard />} />
+                <Route path="/templates" element={<TemplateMarket />} />
+                <Route path="/generator" element={<Generator />} />
+                <Route path="/profile" element={<Profile />} />
 
-        <Route path="*" element={<NotFound />} />
-      </Route>
-    </Routes>
-  );
+                <Route path="*" element={<NotFound />} />
+            </Route>
+        </Routes>
+    );
 }
 
 export default App;
