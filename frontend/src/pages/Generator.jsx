@@ -27,9 +27,20 @@ export default function Generator() {
     const [model, setModel] = useState(MODELS[0].value);
     const [jobDesc, setJobDesc] = useState("");
     const [file, setFile] = useState(null);
+    const [fileInputKey, setFileInputKey] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [resultUrl, setResultUrl] = useState("");
+
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files?.[0] || null;
+        setFile(selectedFile);
+    };
+
+    const handleRemoveFile = () => {
+        setFile(null);
+        setFileInputKey((prev) => prev + 1);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -105,11 +116,35 @@ export default function Generator() {
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Resume (PDF)</label>
                     <Input
+                        key={fileInputKey}
+                        id="resume-upload"
                         type="file"
                         accept="application/pdf"
-                        onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        className="file:bg-black file:text-white file:hover:bg-black/90 file:rounded-md file:px-3 file:py-1.5 file:border-0 file:shadow-xs file:cursor-pointer"
+                        onChange={handleFileChange}
+                        className="sr-only"
                     />
+                    <div className="flex flex-wrap items-center gap-3 rounded-md border border-input px-3 py-2">
+                        <label
+                            htmlFor="resume-upload"
+                            className="inline-flex h-10 cursor-pointer items-center rounded-md bg-black px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-black/90 hover:shadow-md hover:-translate-y-0.5"
+                        >
+                            Choose File
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                            {file ? file.name : "No file selected"}
+                        </p>
+                        {file && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9"
+                                onClick={handleRemoveFile}
+                            >
+                                Remove
+                            </Button>
+                        )}
+                    </div>
                     <p className="text-xs text-muted-foreground">Max 10MB. PDF only.</p>
                 </div>
 
