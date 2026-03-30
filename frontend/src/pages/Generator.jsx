@@ -17,20 +17,37 @@ const TEMPLATES = [
     { value: "academic", label: "Academic" },
 ];
 
-const MODELS = [
-    { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+const PROVIDERS = [
+    { value: "openai", label: "OpenAI" },
+    { value: "anthropic", label: "Anthropic" },
 ];
+
+const PROVIDER_MODELS = {
+    openai: [
+        { value: "gpt-5.4-mini", label: "GPT 5.4 Mini" },
+        { value: "gpt-5.2", label: "GPT 5.2" },
+    ],
+    anthropic: [
+        { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+        { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+    ],
+};
+
+function getModelsForProvider(provider) {
+    return PROVIDER_MODELS[provider] || [];
+}
 
 export default function Generator() {
     const [template, setTemplate] = useState(TEMPLATES[0].value);
-    const [model, setModel] = useState(MODELS[0].value);
+    const [provider, setProvider] = useState(PROVIDERS[0].value);
+    const [model, setModel] = useState(getModelsForProvider(PROVIDERS[0].value)[0]?.value || "");
     const [jobDesc, setJobDesc] = useState("");
     const [file, setFile] = useState(null);
     const [fileInputKey, setFileInputKey] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [resultUrl, setResultUrl] = useState("");
+    const availableModels = getModelsForProvider(provider);
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files?.[0] || null;
@@ -40,6 +57,12 @@ export default function Generator() {
     const handleRemoveFile = () => {
         setFile(null);
         setFileInputKey((prev) => prev + 1);
+    };
+
+    const handleProviderChange = (nextProvider) => {
+        setProvider(nextProvider);
+        const nextModels = getModelsForProvider(nextProvider);
+        setModel(nextModels[0]?.value || "");
     };
 
     const handleSubmit = async (e) => {
@@ -55,17 +78,20 @@ export default function Generator() {
             setError("Please paste the job description.");
             return;
         }
+        if (!provider || !model) {
+            setError("Please select an AI provider and model.");
+            return;
+        }
 
         const form = new FormData();
         form.append("template", template);
         form.append("pdf", file);
         form.append("job_description", jobDesc);
-        // Backend may ignore unknown fields; include model for future support
-        form.append("model", model);
 
         try {
             setLoading(true);
-            const data = await apiUpload("/api/generate/", form);
+            const path = `/api/generate/${encodeURIComponent(provider)}/${encodeURIComponent(model)}/`;
+            const data = await apiUpload(path, form);
             setResultUrl(data?.pdf_url || "");
         } catch (err) {
             setError(typeof err?.message === "string" ? err.message : "Failed to generate.");
@@ -83,7 +109,7 @@ export default function Generator() {
             </header>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Template</label>
                         <Select value={template} onValueChange={setTemplate}>
@@ -99,13 +125,27 @@ export default function Generator() {
                     </div>
 
                     <div className="space-y-2">
+                        <label className="text-sm font-medium">AI Provider</label>
+                        <Select value={provider} onValueChange={handleProviderChange}>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select provider" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PROVIDERS.map((p) => (
+                                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
                         <label className="text-sm font-medium">AI Model</label>
                         <Select value={model} onValueChange={setModel}>
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select model" />
                             </SelectTrigger>
                             <SelectContent>
-                                {MODELS.map((m) => (
+                                {availableModels.map((m) => (
                                     <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                                 ))}
                             </SelectContent>

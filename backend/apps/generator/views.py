@@ -5,7 +5,11 @@ from rest_framework.views import APIView
 from rest_framework import status
 
 from .serializers import ResumeGenerationSerializer
-from .services import process_resume_request
+from .services import (
+    is_supported_provider_model,
+    process_resume_request,
+    supported_provider_models,
+)
 from .storage import save_to_s3_temp, save_to_firestore
 
 
@@ -13,7 +17,18 @@ class GenerateResumeView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser]
 
-    def post(self, request):
+    def post(self, request, provider, model):
+        provider = (provider or "").lower()
+        if not is_supported_provider_model(provider, model):
+            allowed = ", ".join(
+                f"{name}: {', '.join(models)}"
+                for name, models in supported_provider_models().items()
+            )
+            return Response(
+                {"error": f"Unsupported provider/model combination. Allowed: {allowed}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = ResumeGenerationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -23,6 +38,8 @@ class GenerateResumeView(APIView):
                 pdf_file=data["pdf"],
                 template=data["template"],
                 job_description=data["job_description"],
+                provider=provider,
+                model=model,
                 prompt=data.get("prompt", ""),
             )
         except Exception as exc:

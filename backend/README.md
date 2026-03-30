@@ -9,7 +9,7 @@ Django REST Framework API for AI-powered resume generation. Takes a user's PDF r
 - **Django + Django REST Framework** — API framework
 - **Firebase Admin SDK** — authentication (ID token verification)
 - **Firestore** — user profile storage
-- **AI API (TBD)** — resume optimization and LaTeX generation
+- **OpenAI SDK + Anthropic SDK** — resume optimization and LaTeX generation
 
 ---
 
@@ -21,7 +21,7 @@ backend/
 ├── requirements.txt
 │
 ├── config/                         # Project-level config
-│   ├── settings.py                 # Settings (DRF, CORS, Firebase, AI key)
+│   ├── settings.py                 # Settings (DRF, CORS, Firebase, provider API keys)
 │   ├── urls.py                     # Root URL router
 │   └── wsgi.py
 │
@@ -69,9 +69,9 @@ backend/
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/generate/` | Yes | Generate optimized resume as LaTeX |
+| POST | `/api/generate/{provider}/{model}/` | Yes | Generate optimized resume PDF URL |
 
-#### POST `/api/generate/` — Request (multipart/form-data)
+#### POST `/api/generate/{provider}/{model}/` — Request (multipart/form-data)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -80,14 +80,18 @@ backend/
 | `template` | string | No | Template style (default: `classic`) |
 | `prompt` | string | No | Additional user instructions |
 
-**Template choices:** `classic` · `modern` · `minimal` · `academic`
+**Template choices:** `classic` · `modern` · `minimal` · `academic`  
+**Provider/model choices:**
+- `openai`: `gpt-5.4-mini`, `gpt-5.2`
+- `anthropic`: `claude-sonnet-4-5`, `claude-sonnet-4-6`
 
-#### POST `/api/generate/` — Response
+#### POST `/api/generate/{provider}/{model}/` — Response
 
 ```json
 {
-  "latex": "\\documentclass{...} ...",
-  "template": "modern"
+  "pdf_url": "https://...",
+  "template": "modern",
+  "mode": "guest"
 }
 ```
 
@@ -120,7 +124,9 @@ python manage.py runserver
 | `DEBUG` | Debug mode | `True` |
 | `ALLOWED_HOSTS` | Comma-separated allowed hosts | `*` |
 | `FIREBASE_CREDENTIALS` | Path to Firebase service account JSON | `serviceAccountKey.json` |
-| `AI_API_KEY` | API key for the AI provider | — |
+| `AI_API_KEY` | Legacy Anthropic fallback key (optional) | — |
+| `OPENAI_API_KEY` | API key for OpenAI provider | — |
+| `ANTHROPIC_API_KEY` | API key for Anthropic provider (falls back to `AI_API_KEY` if unset) | — |
 
 ---
 
