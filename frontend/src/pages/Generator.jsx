@@ -15,6 +15,7 @@ const TEMPLATES = [
     { value: "modern", label: "Modern" },
     { value: "minimal", label: "Minimal" },
     { value: "academic", label: "Academic" },
+    { value: "jakes", label: "Jake's Resume" },
 ];
 
 const PROVIDERS = [

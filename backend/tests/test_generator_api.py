@@ -68,3 +68,23 @@ class GenerateResumeApiTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 400)
         process_mock.assert_not_called()
+
+    @patch("apps.generator.views.save_to_s3_temp", return_value="https://example.com/generated.pdf")
+    @patch("apps.generator.views.process_resume_request", return_value=("latex", "jakes"))
+    def test_post_accepts_jakes_template(self, process_mock, save_mock):
+        pdf = SimpleUploadedFile("resume.pdf", b"%PDF-1.4 test", content_type="application/pdf")
+        request = self.factory.post(
+            "/api/generate/openai/gpt-5.4-mini/",
+            {
+                "template": "jakes",
+                "pdf": pdf,
+                "job_description": "Job description text",
+            },
+            format="multipart",
+        )
+
+        response = self.view(request, provider="openai", model="gpt-5.4-mini")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["template"], "jakes")
+        process_mock.assert_called_once()
+        save_mock.assert_called_once_with("latex", "jakes")

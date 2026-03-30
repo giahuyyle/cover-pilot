@@ -40,7 +40,7 @@ backend/
     │   └── urls.py
     │
     └── generator/                  # Resume generation pipeline
-        ├── enums.py                # ResumeTemplate enum (classic/modern/minimal/academic)
+        ├── enums.py                # ResumeTemplate enum (classic/modern/minimal/academic/jakes)
         ├── serializers.py          # Request validation (pdf, template, prompt, job_description)
         ├── services.py             # PDF extraction + AI API call + LaTeX output
         ├── views.py                # GenerateResumeView
@@ -80,7 +80,8 @@ backend/
 | `template` | string | No | Template style (default: `classic`) |
 | `prompt` | string | No | Additional user instructions |
 
-**Template choices:** `classic` · `modern` · `minimal` · `academic`  
+**Template choices:** `classic` · `modern` · `minimal` · `academic` · `jakes`  
+`jakes` uses a locked Jake-style LaTeX shell where only resume content is replaced.
 **Provider/model choices:**
 - `openai`: `gpt-5.4-mini`, `gpt-5.2`
 - `anthropic`: `claude-sonnet-4-5`, `claude-sonnet-4-6`

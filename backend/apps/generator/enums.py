@@ -6,6 +6,7 @@ class ResumeTemplate(str, Enum):
     MODERN = "modern"
     MINIMAL = "minimal"
     ACADEMIC = "academic"
+    JAKES = "jakes"
 
     @classmethod
     def choices(cls) -> list[str]:
