@@ -40,6 +40,10 @@ const partners = [
     //     name: "Hanoi-Amsterdam",
     //     logo: "/landing/landing-hero-ams.jpg",
     // }
+    {
+        name: "FSU",
+        logo: "/landing/landing-hero-fsu.png"
+    }
 ]
 
 const efffiencyFeatures = [
