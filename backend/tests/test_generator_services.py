@@ -59,6 +59,31 @@ MISSING_CONTACT_JAKES_SNIPPETS = VALID_JAKES_SNIPPETS.replace(
 
 
 class GeneratorServicesTests(SimpleTestCase):
+    def test_build_user_message_includes_jd_matching_rubric(self):
+        message = services._build_user_message(
+            resume_text="resume",
+            job_description="job description",
+            template="classic",
+            prompt="",
+        )
+
+        self.assertIn("Identify top JD keywords", message)
+        self.assertIn("front-load highest-match bullets", message)
+        self.assertIn("Do not invent concrete achievements", message)
+        self.assertIn("allow only light inference", message)
+
+    def test_build_jakes_user_message_includes_jd_matching_rubric(self):
+        message = services._build_jakes_user_message(
+            resume_text="resume",
+            job_description="job description",
+            prompt="",
+        )
+
+        self.assertIn("Identify top JD keywords", message)
+        self.assertIn("front-load highest-match bullets", message)
+        self.assertIn("Do not invent concrete achievements", message)
+        self.assertIn("allow only light inference", message)
+
     @override_settings(OPENAI_API_KEY="")
     def test_generate_with_openai_requires_key(self):
         with self.assertRaisesRegex(RuntimeError, "OPENAI_API_KEY"):

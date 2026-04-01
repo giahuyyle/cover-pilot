@@ -43,6 +43,7 @@ export default function Generator() {
     const [provider, setProvider] = useState(PROVIDERS[0].value);
     const [model, setModel] = useState(getModelsForProvider(PROVIDERS[0].value)[0]?.value || "");
     const [jobDesc, setJobDesc] = useState("");
+    const [extraInstructions, setExtraInstructions] = useState("");
     const [file, setFile] = useState(null);
     const [fileInputKey, setFileInputKey] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -94,6 +95,7 @@ export default function Generator() {
         form.append("template", template);
         form.append("pdf", file);
         form.append("job_description", jobDesc);
+        form.append("prompt", extraInstructions.trim());
 
         try {
             setLoading(true);
@@ -121,7 +123,7 @@ export default function Generator() {
     };
 
     return (
-        <div className="mx-auto max-w-[92rem] px-6 pb-24">
+        <div className="mx-auto max-w-368 px-6 pb-24">
             <div className="flex flex-col gap-6 lg:gap-10 xl:gap-12 lg:flex-row lg:items-start">
                 <section
                     className={`w-full transition-all duration-500 ease-out motion-reduce:transition-none ${
@@ -229,6 +231,16 @@ export default function Generator() {
                                 />
                             </div>
 
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Extra Instructions (Optional)</label>
+                                <textarea
+                                    className="w-full min-h-24 rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring"
+                                    placeholder='Example: Make up some bulletpoints to better match the job description.'
+                                    value={extraInstructions}
+                                    onChange={(e) => setExtraInstructions(e.target.value)}
+                                />
+                            </div>
+
                             {error && (
                                 <div className="text-sm text-red-600">{error}</div>
                             )}
@@ -256,7 +268,7 @@ export default function Generator() {
                     aria-hidden={!showPreview}
                     className={`w-full overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-none motion-reduce:transform-none ${
                         showPreview
-                            ? "max-h-[90rem] opacity-100 translate-y-0 lg:w-[56%] lg:translate-x-0"
+                            ? "max-h-360 opacity-100 translate-y-0 lg:w-[56%] lg:translate-x-0"
                             : "pointer-events-none max-h-0 opacity-0 translate-y-3 lg:w-0 lg:translate-x-10"
                     }`}
                 >
@@ -280,7 +292,7 @@ export default function Generator() {
                                 <iframe
                                     title="generated-resume-preview"
                                     src={resultUrl}
-                                    className="h-[78vh] min-h-[34rem] w-full rounded-md border border-border bg-background"
+                                    className="h-[78vh] min-h-136 w-full rounded-md border border-border bg-background"
                                     onError={() => setViewerFailed(true)}
                                     onLoad={() => setViewerFailed(false)}
                                 />
