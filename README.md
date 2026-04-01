@@ -154,3 +154,7 @@ Supported templates:
 - Firebase auth/profile errors: verify `serviceAccountKey.json` path and Firebase project permissions.
 - Empty/failed generation response: verify AI provider key for the selected provider/model.
 - CORS or frontend API errors: confirm `VITE_API_URL` points to the running backend.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](/Users/huylegia/Coding-Projects/cover-pilot/LICENSE).
