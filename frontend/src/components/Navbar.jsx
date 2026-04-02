@@ -29,7 +29,7 @@ export default function Navbar() {
 
     const handleLogout = async () => {
         await signOut(auth);
-        navigate("/");
+        navigate("/dashboard");
     };
 
     const renderItem = (item) => {

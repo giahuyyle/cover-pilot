@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { auth } from "@/lib/firebase";
 import { apiFetch } from "@/lib/api";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateProfile } from "firebase/auth";
 import { Search, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,12 @@ export default function Profile() {
     const [backendProfile, setBackendProfile] = useState(null);
     const [backendLoading, setBackendLoading] = useState(false);
     const [backendError, setBackendError] = useState("");
-
-    const isHtmlError =
-        typeof backendError === "string" &&
-        /<\s*!doctype\s+html|<\s*html[\s>]/i.test(backendError);
-
-    const displayName = user?.displayName || "User";
-    const firstName = displayName.split(" ")[0];
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [profileSaveError, setProfileSaveError] = useState("");
+    const [profileSaveSuccess, setProfileSaveSuccess] = useState("");
+    const profileDisplayName =
+        (user?.displayName || backendProfile?.display_name || "User").trim() || "User";
+    const firstName = profileDisplayName.split(" ")[0] || "U";
     const email = user?.email || "";
     const photoURL = user?.photoURL;
 
@@ -35,7 +34,7 @@ export default function Profile() {
 
     const [formData, setFormData] = useState({
         fullName: "",
-        nickName: "",
+        displayName: "",
     });
 
     const handleChange = (field, value) => {
@@ -60,6 +59,10 @@ export default function Profile() {
                 const data = await apiFetch("/api/users/me/");
                 if (isMounted) {
                     setBackendProfile(data);
+                    setFormData({
+                        fullName: data?.full_name || "",
+                        displayName: data?.display_name || user?.displayName || "",
+                    });
                 }
             } catch (error) {
                 if (isMounted) {
@@ -78,6 +81,57 @@ export default function Profile() {
             isMounted = false;
         };
     }, [user]);
+
+    const handleProfileAction = async () => {
+        if (!isEditing) {
+            setIsEditing(true);
+            setProfileSaveError("");
+            setProfileSaveSuccess("");
+            return;
+        }
+
+        const nextFullName = formData.fullName.trim();
+        const nextDisplayName = formData.displayName.trim();
+
+        setProfileSaveError("");
+        setProfileSaveSuccess("");
+        setProfileSaving(true);
+
+        try {
+            const updated = await apiFetch("/api/users/me/", {
+                method: "PUT",
+                body: JSON.stringify({
+                    full_name: nextFullName,
+                    display_name: nextDisplayName,
+                }),
+            });
+
+            if (user) {
+                try {
+                    await updateProfile(user, { displayName: nextDisplayName });
+                } catch (firebaseSyncError) {
+                    console.error("Failed to sync Firebase display name:", firebaseSyncError);
+                }
+            }
+
+            setBackendProfile((prev) => ({
+                ...(prev || {}),
+                ...(updated || {}),
+                full_name: nextFullName,
+                display_name: nextDisplayName,
+            }));
+            setFormData({
+                fullName: nextFullName,
+                displayName: nextDisplayName,
+            });
+            setIsEditing(false);
+            setProfileSaveSuccess("Profile updated successfully.");
+        } catch (error) {
+            setProfileSaveError(error.message || "Failed to update profile.");
+        } finally {
+            setProfileSaving(false);
+        }
+    };
 
     // Change password form
     const {
@@ -184,16 +238,17 @@ export default function Profile() {
                     </div>
                     <div>
                         <h2 className="text-lg font-semibold text-foreground">
-                            {displayName}
+                            {profileDisplayName}
                         </h2>
                         <p className="text-sm text-muted-foreground">{email}</p>
                     </div>
                 </div>
                 <Button
-                    onClick={() => setIsEditing(!isEditing)}
+                    onClick={handleProfileAction}
+                    disabled={backendLoading || profileSaving}
                     className="rounded-lg px-6"
                 >
-                    {isEditing ? "Save" : "Edit"}
+                    {isEditing ? (profileSaving ? "Saving..." : "Save") : "Edit"}
                 </Button>
             </div>
 
@@ -210,17 +265,33 @@ export default function Profile() {
                     />
                 </div>
 
-                {/* Nick Name */}
+                {/* Display Name */}
                 <div className="space-y-2">
-                    <Label>Nick Name</Label>
+                    <Label>Display Name</Label>
                     <Input
-                        placeholder="Your Nick Name"
-                        value={formData.nickName}
-                        onChange={(e) => handleChange("nickName", e.target.value)}
+                        placeholder="Your Display Name"
+                        value={formData.displayName}
+                        onChange={(e) => handleChange("displayName", e.target.value)}
                         disabled={!isEditing}
                     />
                 </div>
             </div>
+
+            {backendLoading && (
+                <p className="mb-6 text-sm text-muted-foreground">Loading profile...</p>
+            )}
+
+            {backendError && (
+                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap break-words">{backendError}</p>
+            )}
+
+            {profileSaveError && (
+                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap break-words">{profileSaveError}</p>
+            )}
+
+            {profileSaveSuccess && (
+                <p className="mb-6 text-sm text-green-600">{profileSaveSuccess}</p>
+            )}
 
             {/* My email Address */}
             <div>

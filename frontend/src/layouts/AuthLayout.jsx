@@ -107,14 +107,18 @@ export default function AuthLayout({ isLogin = true }) {
         if (user) navigate("/dashboard");
     }, [user, navigate]);
 
-    const syncUserProfileToBackend = async (firebaseUser) => {
+    const syncUserProfileToBackend = async (firebaseUser, fullNameOverride = "") => {
         if (!firebaseUser) return;
+
+        const normalizedFullName = (fullNameOverride || firebaseUser.displayName || "").trim();
+        const normalizedDisplayName = (firebaseUser.displayName || normalizedFullName).trim();
 
         try {
             await apiFetch("/api/users/me/", {
                 method: "PUT",
                 body: JSON.stringify({
-                    display_name: firebaseUser.displayName || "",
+                    full_name: normalizedFullName,
+                    display_name: normalizedDisplayName,
                     photo_url: firebaseUser.photoURL || "",
                 }),
             });
@@ -140,7 +144,7 @@ export default function AuthLayout({ isLogin = true }) {
             } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
                 await updateProfile(userCredential.user, { displayName: data.fullName });
-                await syncUserProfileToBackend(userCredential.user);
+                await syncUserProfileToBackend(userCredential.user, data.fullName);
             }
             navigate("/dashboard");
         } catch (error) {

@@ -15,6 +15,7 @@ class User:
 
     uid: str
     email: str
+    full_name: str = ""
     display_name: str = ""
     photo_url: str = ""
     bio: str = ""
@@ -29,6 +30,7 @@ class User:
         return cls(
             uid=data.get("uid", ""),
             email=data.get("email", ""),
+            full_name=data.get("full_name", ""),
             display_name=data.get("display_name", ""),
             photo_url=data.get("photo_url", ""),
             bio=data.get("bio", ""),
