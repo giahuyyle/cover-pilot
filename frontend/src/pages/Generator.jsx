@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,6 +9,8 @@ import {
     SelectItem,
 } from "@/components/ui/select";
 import { apiUpload } from "@/lib/api";
+import { auth } from "@/lib/firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 const TEMPLATES = [
     { value: "classic", label: "Classic" },
@@ -34,14 +36,18 @@ const PROVIDER_MODELS = {
     ],
 };
 
+const GUEST_PROVIDER = "openai";
+const GUEST_MODEL = "gpt-5.4-mini";
+
 function getModelsForProvider(provider) {
     return PROVIDER_MODELS[provider] || [];
 }
 
 export default function Generator() {
+    const [user, authLoading] = useAuthState(auth);
     const [template, setTemplate] = useState(TEMPLATES[0].value);
-    const [provider, setProvider] = useState(PROVIDERS[0].value);
-    const [model, setModel] = useState(getModelsForProvider(PROVIDERS[0].value)[0]?.value || "");
+    const [provider, setProvider] = useState(GUEST_PROVIDER);
+    const [model, setModel] = useState(GUEST_MODEL);
     const [jobDesc, setJobDesc] = useState("");
     const [extraInstructions, setExtraInstructions] = useState("");
     const [file, setFile] = useState(null);
@@ -51,6 +57,15 @@ export default function Generator() {
     const [resultUrl, setResultUrl] = useState("");
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [viewerFailed, setViewerFailed] = useState(false);
+    const isGuest = !authLoading && !user;
+
+    useEffect(() => {
+        if (isGuest) {
+            setProvider(GUEST_PROVIDER);
+            setModel(GUEST_MODEL);
+        }
+    }, [isGuest]);
+
     const availableModels = getModelsForProvider(provider);
     const hasResult = Boolean(resultUrl);
     const showPreview = hasResult && isPreviewOpen;
@@ -139,10 +154,15 @@ export default function Generator() {
                             <p className="text-sm font-mono mb-1 text-[rgb(108,144,46)]">{`{ generator }`}</p>
                             <h1 className="text-3xl font-bold">Generate Tailored Resume</h1>
                             <p className="text-muted-foreground">Upload your resume PDF, choose a template, paste the job description, pick a model, and generate.</p>
+                            {isGuest && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Guest mode uses a default AI model. Login or sign up to unlock full provider and model choice.
+                                </p>
+                            )}
                         </header>
 
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid sm:grid-cols-3 gap-4">
+                            <div className={`grid gap-4 ${isGuest ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Template</label>
                                     <Select value={template} onValueChange={setTemplate}>
@@ -157,33 +177,37 @@ export default function Generator() {
                                     </Select>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">AI Provider</label>
-                                    <Select value={provider} onValueChange={handleProviderChange}>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select provider" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {PROVIDERS.map((p) => (
-                                                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                {!isGuest && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">AI Provider</label>
+                                        <Select value={provider} onValueChange={handleProviderChange}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Select provider" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {PROVIDERS.map((p) => (
+                                                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">AI Model</label>
-                                    <Select value={model} onValueChange={setModel}>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select model" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availableModels.map((m) => (
-                                                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                {!isGuest && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">AI Model</label>
+                                        <Select value={model} onValueChange={setModel}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Select model" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availableModels.map((m) => (
+                                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">

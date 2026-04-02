@@ -90,7 +90,7 @@ export default function Landing() {
                     
                     <Link 
                         className="ml-auto cursor-pointer bg-[rgb(219,252,167)] hover:bg-[rgb(108,144,46)] text-black text-sm font-extralight py-2 px-4 rounded-md"
-                        to="/login"
+                        to="/dashboard"
                     >
                         Get Started
                     </Link>

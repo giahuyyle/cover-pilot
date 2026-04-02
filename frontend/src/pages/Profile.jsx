@@ -250,55 +250,6 @@ export default function Profile() {
                 </div>
             </div>
 
-            {/* Backend profile */}
-            <div className="mt-10">
-                <h3 className="text-lg font-semibold text-foreground mb-4">
-                    Backend Profile (/api/users/me)
-                </h3>
-
-                <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-                    {backendLoading && (
-                        <p className="text-sm text-muted-foreground">Loading backend profile...</p>
-                    )}
-
-                    {!backendLoading && backendError && (
-                        <div className="space-y-3">
-                            <p className="text-sm text-red-500">Backend returned an HTML error page.</p>
-                            {isHtmlError ? (
-                                <iframe
-                                    title="backend-html-error"
-                                    srcDoc={backendError}
-                                    className="w-full min-h-105 rounded-md border border-border bg-background"
-                                    sandbox="allow-same-origin"
-                                />
-                            ) : (
-                                <p className="text-sm text-red-500 whitespace-pre-wrap wrap-break-word">{backendError}</p>
-                            )}
-                        </div>
-                    )}
-
-                    {!backendLoading && !backendError && backendProfile && (
-                        <div className="space-y-1">
-                            <p className="text-sm text-foreground">
-                                <span className="font-medium">Display name:</span>{" "}
-                                {backendProfile.display_name || "-"}
-                            </p>
-                            <p className="text-sm text-foreground">
-                                <span className="font-medium">Bio:</span> {backendProfile.bio || "-"}
-                            </p>
-                            <p className="text-sm text-foreground break-all">
-                                <span className="font-medium">Photo URL:</span>{" "}
-                                {backendProfile.photo_url || "-"}
-                            </p>
-                        </div>
-                    )}
-
-                    {!backendLoading && !backendError && !backendProfile && (
-                        <p className="text-sm text-muted-foreground">No backend profile data found.</p>
-                    )}
-                </div>
-            </div>
-
             {/* Change Password */}
             <div className="mt-10">
                 <h3 className="text-lg font-semibold text-foreground mb-4">

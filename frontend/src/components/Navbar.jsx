@@ -1,23 +1,31 @@
-import { Home, LayoutTemplate, PenTool, HardDrive, UserRound, LogOut, Sparkles } from "lucide-react";
+import { Home, LayoutTemplate, PenTool, HardDrive, UserRound, LogIn, LogOut, Sparkles } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
+import { useAuthState } from "react-firebase-hooks/auth";
 
-const mainItems = [
+const coreItems = [
     { label: "Home", icon: Home, to: "/dashboard" },
     { label: "Templates", icon: LayoutTemplate, to: "/templates" },
     { label: "Generator", icon: Sparkles, to: "/generator" },
     { label: "Editor", icon: PenTool, to: "/editor" },
+];
+
+const authenticatedMainItems = [
     { label: "Storage", icon: HardDrive, to: "/storage" },
 ];
 
-const rightItems = [
+const authenticatedRightItems = [
     { label: "Profile", icon: UserRound, to: "/profile" },
 ];
 
 export default function Navbar() {
+    const [user] = useAuthState(auth);
     const { pathname } = useLocation();
     const navigate = useNavigate();
+
+    const mainItems = user ? [...coreItems, ...authenticatedMainItems] : coreItems;
+    const rightItems = user ? authenticatedRightItems : [];
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -67,16 +75,30 @@ export default function Navbar() {
 
                     {rightItems.map(renderItem)}
 
-                    {/* Logout button */}
-                    <button onClick={handleLogout} className="flex flex-col items-center gap-1.5 cursor-pointer">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition bg-white/80 hover:bg-red-100">
-                            <LogOut className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
-                        </div>
-                        <span className="text-xs text-zinc-700">Logout</span>
-                    </button>
+                    {user ? (
+                        <button onClick={handleLogout} className="flex flex-col items-center gap-1.5 cursor-pointer">
+                            <div className="flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition bg-white/80 hover:bg-red-100">
+                                <LogOut className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
+                            </div>
+                            <span className="text-xs text-zinc-700">Logout</span>
+                        </button>
+                    ) : (
+                        <Link to="/login" className="flex flex-col items-center gap-1.5 cursor-pointer">
+                            <div
+                                className={`flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition ${
+                                    pathname.startsWith("/login")
+                                        ? "bg-zinc-200/60"
+                                        : "bg-white/80 hover:bg-zinc-200/50"
+                                }`}
+                            >
+                                <LogIn className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
+                            </div>
+                            <span className="text-xs text-zinc-700">Login</span>
+                        </Link>
+                    )}
                 </nav>
             </header>
         </div>
-		
+
     );
 }
