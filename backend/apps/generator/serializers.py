@@ -11,3 +11,4 @@ class ResumeGenerationSerializer(serializers.Serializer):
     pdf = serializers.FileField()
     prompt = serializers.CharField(required=False, default="", allow_blank=True)
     job_description = serializers.CharField()
+    guest_id = serializers.CharField(required=False, default="", allow_blank=True)

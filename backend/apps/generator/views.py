@@ -1,3 +1,5 @@
+import re
+
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -10,7 +12,13 @@ from .services import (
     process_resume_request,
     supported_provider_models,
 )
-from .storage import save_to_s3_temp, save_to_firestore
+from .storage import save_to_s3_temp, save_to_firestore, save_guest_to_firestore
+
+
+def _sanitize_guest_id(value: str) -> str:
+    """Restrict guest IDs to safe path/document characters."""
+    normalized = re.sub(r"[^A-Za-z0-9_-]", "_", (value or "").strip())
+    return normalized[:128]
 
 
 class GenerateResumeView(APIView):
@@ -55,6 +63,18 @@ class GenerateResumeView(APIView):
                 doc_id, pdf_url = save_to_firestore(uid, latex, template)
                 return Response(
                     {"pdf_url": pdf_url, "template": template, "mode": "user", "doc_id": doc_id},
+                    status=status.HTTP_200_OK,
+                )
+
+            guest_id = _sanitize_guest_id(
+                data.get("guest_id")
+                or request.headers.get("X-Guest-Id", "")
+                or request.query_params.get("guest_id", "")
+            )
+            if guest_id:
+                doc_id, pdf_url = save_guest_to_firestore(guest_id, latex, template)
+                return Response(
+                    {"pdf_url": pdf_url, "template": template, "mode": "guest", "doc_id": doc_id},
                     status=status.HTTP_200_OK,
                 )
 

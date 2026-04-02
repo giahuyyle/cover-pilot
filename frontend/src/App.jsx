@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import TemplateMarket from "./pages/TemplateMarket";
 import Generator from "./pages/Generator";
+import Storage from "./pages/Storage";
 
 function ProtectedRootLayout() {
     const [user, loading] = useAuthState(auth);
@@ -36,6 +37,7 @@ function App() {
                 <Route path="/templates" element={<TemplateMarket />} />
                 <Route path="/generator" element={<Generator />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/storage" element={<Storage />} />
 
                 <Route path="*" element={<NotFound />} />
             </Route>
