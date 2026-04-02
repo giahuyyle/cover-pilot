@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 import uuid
@@ -17,6 +18,14 @@ ACTIVE_STORAGE_LINK_TTL_SECONDS = 15 * 60
 DEFAULT_STORAGE_PAGE = 1
 DEFAULT_STORAGE_PAGE_SIZE = 10
 MAX_STORAGE_PAGE_SIZE = 50
+HEROKU_APT_PREFIX = "/app/.apt/"
+HEROKU_TEXMF_DIST = Path("/app/.apt/usr/share/texlive/texmf-dist")
+HEROKU_TEXMF_MAIN = Path("/app/.apt/usr/share/texmf")
+HEROKU_TEXMFCNF = HEROKU_TEXMF_DIST / "web2c"
+HEROKU_TEXMF_ROOT = Path("/app/.apt/usr/share/texlive")
+HEROKU_RUNTIME_TEXMF_CONFIG = Path("/tmp/cover-pilot-texmf-config")
+HEROKU_RUNTIME_TEXMF_VAR = Path("/tmp/cover-pilot-texmf-var")
+HEROKU_RUNTIME_TEXFORMATS = HEROKU_RUNTIME_TEXMF_VAR / "web2c"
 
 
 def _resolve_pdflatex() -> str:
@@ -40,9 +49,68 @@ def _resolve_pdflatex() -> str:
     )
 
 
+def _texlive_env_for_runtime(pdflatex_path: str) -> dict[str, str]:
+    """Return subprocess env with Heroku TeX Live runtime fixes when needed."""
+    env = os.environ.copy()
+    if not pdflatex_path.startswith(HEROKU_APT_PREFIX):
+        return env
+
+    HEROKU_RUNTIME_TEXMF_CONFIG.mkdir(parents=True, exist_ok=True)
+    HEROKU_RUNTIME_TEXMF_VAR.mkdir(parents=True, exist_ok=True)
+    HEROKU_RUNTIME_TEXFORMATS.mkdir(parents=True, exist_ok=True)
+
+    env["TEXMFCNF"] = str(HEROKU_TEXMFCNF)
+    env["TEXMFROOT"] = str(HEROKU_TEXMF_ROOT)
+    env["TEXMFCONFIG"] = str(HEROKU_RUNTIME_TEXMF_CONFIG)
+    env["TEXMFVAR"] = str(HEROKU_RUNTIME_TEXMF_VAR)
+    env["TEXMFSYSCONFIG"] = str(HEROKU_RUNTIME_TEXMF_CONFIG)
+    env["TEXMFSYSVAR"] = str(HEROKU_RUNTIME_TEXMF_VAR)
+    env["TEXFORMATS"] = str(HEROKU_RUNTIME_TEXFORMATS)
+    env["TEXMF"] = (
+        f"{{{HEROKU_RUNTIME_TEXMF_CONFIG},{HEROKU_RUNTIME_TEXMF_VAR},/app/texmf,"
+        f"{HEROKU_TEXMF_MAIN},{HEROKU_TEXMF_DIST}}}"
+    )
+    return env
+
+
+def _ensure_heroku_pdflatex_format(pdflatex_path: str, env: dict[str, str]) -> None:
+    """Generate pdflatex.fmt in writable storage for Heroku apt TeX runtime."""
+    if not pdflatex_path.startswith(HEROKU_APT_PREFIX):
+        return
+
+    fmt_path = HEROKU_RUNTIME_TEXFORMATS / "pdflatex.fmt"
+    if fmt_path.exists():
+        return
+
+    pdftex = shutil.which("pdftex", path=env.get("PATH"))
+    if not pdftex:
+        fallback = Path("/app/.apt/usr/bin/pdftex")
+        if fallback.exists():
+            pdftex = str(fallback)
+
+    if not pdftex:
+        raise RuntimeError("pdftex is unavailable; cannot initialize pdflatex format.")
+
+    init_result = subprocess.run(
+        [pdftex, "-ini", "-etex", "-jobname=pdflatex", "-progname=pdflatex", "pdflatex.ini"],
+        cwd=str(HEROKU_RUNTIME_TEXFORMATS),
+        capture_output=True,
+        text=True,
+        env=env,
+        input="",
+    )
+    if not fmt_path.exists():
+        raise RuntimeError(
+            "Failed to initialize pdflatex.fmt on Heroku runtime.\n"
+            f"{init_result.stdout}\n{init_result.stderr}"
+        )
+
+
 def _compile_latex_to_pdf(latex: str) -> bytes:
     """Compile a LaTeX string to PDF bytes using pdflatex."""
     pdflatex = _resolve_pdflatex()
+    env = _texlive_env_for_runtime(pdflatex)
+    _ensure_heroku_pdflatex_format(pdflatex, env)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tex_path = Path(tmpdir) / "resume.tex"
@@ -54,6 +122,7 @@ def _compile_latex_to_pdf(latex: str) -> bytes:
             [pdflatex, "-interaction=nonstopmode", "-output-directory", tmpdir, str(tex_path)],
             capture_output=True,
             text=True,
+            env=env,
         )
 
         if not pdf_path.exists():
