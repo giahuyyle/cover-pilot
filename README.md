@@ -151,6 +151,7 @@ Supported templates:
 ## Troubleshooting
 
 - `pdflatex not found`: install MacTeX (or another TeX distribution) and ensure `pdflatex` is on PATH.
+- `File 'fullpage.sty' not found` (or `titlesec.sty` / `enumitem.sty`) with `template=jakes`: ensure backend build installs `texlive-latex-extra` (configured in `backend/Aptfile` for Heroku apt buildpack).
 - Firebase auth/profile errors: verify `serviceAccountKey.json` path and Firebase project permissions.
 - Empty/failed generation response: verify AI provider key for the selected provider/model.
 - CORS or frontend API errors: confirm `VITE_API_URL` points to the running backend.
