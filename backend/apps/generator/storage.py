@@ -25,6 +25,11 @@ def _resolve_pdflatex() -> str:
     if pdflatex:
         return pdflatex
 
+    # Common path when using Heroku apt buildpack.
+    heroku_fallback = Path("/app/.apt/usr/bin/pdflatex")
+    if heroku_fallback.exists():
+        return str(heroku_fallback)
+
     # Default MacTeX binary location on macOS.
     fallback = Path("/Library/TeX/texbin/pdflatex")
     if fallback.exists():
