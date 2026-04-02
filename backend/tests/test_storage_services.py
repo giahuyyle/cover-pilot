@@ -57,27 +57,104 @@ class StorageServicesTests(SimpleTestCase):
         s3_client_mock.return_value = s3
 
         result = list_user_documents("uid-1")
+        documents = result["documents"]
+        pagination = result["pagination"]
 
-        self.assertEqual([row["id"] for row in result], ["new", "legacy", "expired"])
+        self.assertEqual([row["id"] for row in documents], ["new", "legacy", "expired"])
+        self.assertEqual(pagination["page"], 1)
+        self.assertEqual(pagination["page_size"], 10)
+        self.assertEqual(pagination["total_items"], 3)
+        self.assertEqual(pagination["total_pages"], 1)
+        self.assertFalse(pagination["has_next"])
+        self.assertFalse(pagination["has_prev"])
 
-        self.assertFalse(result[0]["expired"])
-        self.assertEqual(result[0]["view_url"], "https://example.com/new/view")
-        self.assertEqual(result[0]["download_url"], "https://example.com/new/download")
-        self.assertEqual(result[0]["name"], "new.pdf")
+        self.assertFalse(documents[0]["expired"])
+        self.assertEqual(documents[0]["view_url"], "https://example.com/new/view")
+        self.assertEqual(documents[0]["download_url"], "https://example.com/new/download")
+        self.assertEqual(documents[0]["name"], "new.pdf")
 
-        self.assertFalse(result[1]["expired"])
+        self.assertFalse(documents[1]["expired"])
         expected_legacy_expiry = created_legacy + timedelta(seconds=USER_DOC_TTL_SECONDS)
         self.assertEqual(
-            datetime.fromisoformat(result[1]["expires_at"]),
+            datetime.fromisoformat(documents[1]["expires_at"]),
             expected_legacy_expiry,
         )
-        self.assertEqual(result[1]["view_url"], "https://example.com/legacy/view")
-        self.assertEqual(result[1]["download_url"], "https://example.com/legacy/download")
-        self.assertEqual(result[1]["name"], "legacy.pdf")
+        self.assertEqual(documents[1]["view_url"], "https://example.com/legacy/view")
+        self.assertEqual(documents[1]["download_url"], "https://example.com/legacy/download")
+        self.assertEqual(documents[1]["name"], "legacy.pdf")
 
-        self.assertTrue(result[2]["expired"])
-        self.assertNotIn("view_url", result[2])
-        self.assertNotIn("download_url", result[2])
-        self.assertEqual(result[2]["name"], "expired.pdf")
+        self.assertTrue(documents[2]["expired"])
+        self.assertNotIn("view_url", documents[2])
+        self.assertNotIn("download_url", documents[2])
+        self.assertEqual(documents[2]["name"], "expired.pdf")
 
         self.assertEqual(s3.generate_presigned_url.call_count, 4)
+
+    @patch("apps.generator.storage._s3_client")
+    @patch("apps.generator.storage.firestore.client")
+    def test_list_user_documents_returns_requested_page_slice(self, firestore_client_mock, s3_client_mock):
+        now = datetime.now(timezone.utc)
+        docs = [
+            _FakeDoc(f"doc-{i}", {
+                "template": "classic",
+                "s3_key": f"users/uid-1/doc-{i}.pdf",
+                "created_at": (now - timedelta(minutes=i)).isoformat(),
+                "expires_at": (now + timedelta(hours=1)).isoformat(),
+            })
+            for i in range(5)
+        ]
+
+        db = MagicMock()
+        firestore_client_mock.return_value = db
+        db.collection.return_value.document.return_value.collection.return_value.stream.return_value = docs
+
+        s3 = MagicMock()
+        s3.generate_presigned_url.side_effect = [f"https://example.com/url-{i}" for i in range(20)]
+        s3_client_mock.return_value = s3
+
+        result = list_user_documents("uid-1", page=2, page_size=2)
+        documents = result["documents"]
+        pagination = result["pagination"]
+
+        self.assertEqual([row["id"] for row in documents], ["doc-2", "doc-3"])
+        self.assertEqual(pagination["page"], 2)
+        self.assertEqual(pagination["page_size"], 2)
+        self.assertEqual(pagination["total_items"], 5)
+        self.assertEqual(pagination["total_pages"], 3)
+        self.assertTrue(pagination["has_next"])
+        self.assertTrue(pagination["has_prev"])
+
+    @patch("apps.generator.storage._s3_client")
+    @patch("apps.generator.storage.firestore.client")
+    def test_list_user_documents_normalizes_invalid_and_out_of_range_pagination(self, firestore_client_mock, s3_client_mock):
+        now = datetime.now(timezone.utc)
+        docs = [
+            _FakeDoc(f"doc-{i}", {
+                "template": "classic",
+                "s3_key": f"users/uid-1/doc-{i}.pdf",
+                "created_at": (now - timedelta(minutes=i)).isoformat(),
+                "expires_at": (now + timedelta(hours=1)).isoformat(),
+            })
+            for i in range(2)
+        ]
+
+        db = MagicMock()
+        firestore_client_mock.return_value = db
+        db.collection.return_value.document.return_value.collection.return_value.stream.return_value = docs
+
+        s3 = MagicMock()
+        s3.generate_presigned_url.side_effect = [f"https://example.com/url-{i}" for i in range(8)]
+        s3_client_mock.return_value = s3
+
+        # Invalid params fall back to defaults.
+        fallback_result = list_user_documents("uid-1", page="abc", page_size="xyz")
+        fallback_pagination = fallback_result["pagination"]
+        self.assertEqual(fallback_pagination["page"], 1)
+        self.assertEqual(fallback_pagination["page_size"], 10)
+
+        # Out-of-range page clamps to last page.
+        clamped_result = list_user_documents("uid-1", page=999, page_size=1)
+        clamped_pagination = clamped_result["pagination"]
+        self.assertEqual(clamped_pagination["page"], 2)
+        self.assertEqual(clamped_pagination["total_pages"], 2)
+        self.assertFalse(clamped_pagination["has_next"])

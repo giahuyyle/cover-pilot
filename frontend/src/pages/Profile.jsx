@@ -282,11 +282,11 @@ export default function Profile() {
             )}
 
             {backendError && (
-                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap break-words">{backendError}</p>
+                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap wrap-break-word">{backendError}</p>
             )}
 
             {profileSaveError && (
-                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap break-words">{profileSaveError}</p>
+                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap wrap-break-word">{profileSaveError}</p>
             )}
 
             {profileSaveSuccess && (

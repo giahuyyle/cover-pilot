@@ -2,6 +2,7 @@ import subprocess
 import tempfile
 import uuid
 import shutil
+import math
 from datetime import datetime, timezone, timedelta
 from pathlib import Path, PurePosixPath
 
@@ -12,6 +13,9 @@ from firebase_admin import firestore
 USER_DOC_TTL_SECONDS = 24 * 60 * 60
 GUEST_DOC_TTL_SECONDS = 30 * 60
 ACTIVE_STORAGE_LINK_TTL_SECONDS = 15 * 60
+DEFAULT_STORAGE_PAGE = 1
+DEFAULT_STORAGE_PAGE_SIZE = 10
+MAX_STORAGE_PAGE_SIZE = 50
 
 
 def _resolve_pdflatex() -> str:
@@ -111,6 +115,15 @@ def _s3_filename(key: str, fallback_doc_id: str) -> str:
     return filename or f"Document {fallback_doc_id}"
 
 
+def _normalize_positive_int(value, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+
+    return parsed if parsed > 0 else default
+
+
 def save_to_s3_temp(latex: str, template: str) -> str:
     """Compile LaTeX to PDF, upload to S3 temp/, return a short-lived presigned download URL."""
     pdf_bytes = _compile_latex_to_pdf(latex)
@@ -198,11 +211,16 @@ def save_guest_to_firestore(guest_id: str, latex: str, template: str) -> tuple[s
     return doc_ref.id, pdf_url
 
 
-def list_user_documents(uid: str) -> list[dict]:
-    """Return user-generated documents with expiry status and active links."""
+def list_user_documents(uid: str, page=DEFAULT_STORAGE_PAGE, page_size=DEFAULT_STORAGE_PAGE_SIZE) -> dict:
+    """Return paginated user-generated documents with expiry status and active links."""
     now = datetime.now(timezone.utc)
     db = firestore.client()
     s3 = _s3_client()
+    normalized_page = _normalize_positive_int(page, DEFAULT_STORAGE_PAGE)
+    normalized_page_size = min(
+        _normalize_positive_int(page_size, DEFAULT_STORAGE_PAGE_SIZE),
+        MAX_STORAGE_PAGE_SIZE,
+    )
 
     rows: list[tuple[datetime, dict]] = []
     docs = db.collection("users").document(uid).collection("resumes").stream()
@@ -256,4 +274,22 @@ def list_user_documents(uid: str) -> list[dict]:
         rows.append((sort_key, record))
 
     rows.sort(key=lambda item: item[0], reverse=True)
-    return [row[1] for row in rows]
+    documents = [row[1] for row in rows]
+    total_items = len(documents)
+    total_pages = max(1, math.ceil(total_items / normalized_page_size))
+    normalized_page = min(normalized_page, total_pages)
+
+    start = (normalized_page - 1) * normalized_page_size
+    end = start + normalized_page_size
+
+    return {
+        "documents": documents[start:end],
+        "pagination": {
+            "page": normalized_page,
+            "page_size": normalized_page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "has_next": normalized_page < total_pages,
+            "has_prev": normalized_page > 1,
+        },
+    }

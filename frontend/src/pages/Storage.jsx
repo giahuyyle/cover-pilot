@@ -4,6 +4,32 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
+const PAGE_SIZE = 10;
+
+function createDefaultPagination() {
+    return {
+        page: 1,
+        page_size: PAGE_SIZE,
+        total_items: 0,
+        total_pages: 1,
+        has_next: false,
+        has_prev: false,
+    };
+}
+
+function normalizePagination(value) {
+    const safe = value || {};
+
+    return {
+        page: Number(safe.page) > 0 ? Number(safe.page) : 1,
+        page_size: Number(safe.page_size) > 0 ? Number(safe.page_size) : PAGE_SIZE,
+        total_items: Number(safe.total_items) >= 0 ? Number(safe.total_items) : 0,
+        total_pages: Number(safe.total_pages) > 0 ? Number(safe.total_pages) : 1,
+        has_next: Boolean(safe.has_next),
+        has_prev: Boolean(safe.has_prev),
+    };
+}
+
 function formatDateTime(value) {
     if (!value) return "-";
 
@@ -24,10 +50,14 @@ export default function Storage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [documents, setDocuments] = useState([]);
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState(createDefaultPagination());
 
     useEffect(() => {
         if (!user) {
             setDocuments([]);
+            setPagination(createDefaultPagination());
+            setPage(1);
             return;
         }
 
@@ -37,9 +67,14 @@ export default function Storage() {
             setLoading(true);
             setError("");
             try {
-                const payload = await apiFetch("/api/users/storage/");
+                const payload = await apiFetch(`/api/users/storage/?page=${page}&page_size=${PAGE_SIZE}`);
                 if (mounted) {
                     setDocuments(Array.isArray(payload?.documents) ? payload.documents : []);
+                    const normalizedPagination = normalizePagination(payload?.pagination);
+                    setPagination(normalizedPagination);
+                    if (normalizedPagination.page !== page) {
+                        setPage(normalizedPagination.page);
+                    }
                 }
             } catch (nextError) {
                 if (mounted) {
@@ -56,7 +91,7 @@ export default function Storage() {
         return () => {
             mounted = false;
         };
-    }, [user]);
+    }, [user, page]);
 
     if (authLoading) {
         return <div className="mx-auto max-w-5xl px-6 pb-20 text-muted-foreground">Loading...</div>;
@@ -123,6 +158,34 @@ export default function Storage() {
                     );
                 })}
             </section>
+
+            <div className="mt-6 flex items-center justify-between">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={loading || !pagination.has_prev}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                >
+                    Prev
+                </Button>
+
+                <p className="text-sm text-muted-foreground text-center">
+                    Page {pagination.page} of {pagination.total_pages}
+                    {" \u2022 "}
+                    {pagination.total_items} total documents
+                </p>
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={loading || !pagination.has_next}
+                    onClick={() => setPage((prev) => prev + 1)}
+                >
+                    Next
+                </Button>
+            </div>
         </div>
     );
 }

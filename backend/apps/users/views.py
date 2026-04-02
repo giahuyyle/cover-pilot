@@ -29,5 +29,7 @@ class StorageListView(APIView):
 
     def get(self, request):
         uid = request.user["uid"]
-        documents = list_user_documents(uid)
-        return Response({"documents": documents}, status=status.HTTP_200_OK)
+        page = request.query_params.get("page")
+        page_size = request.query_params.get("page_size")
+        payload = list_user_documents(uid, page=page, page_size=page_size)
+        return Response(payload, status=status.HTTP_200_OK)
