@@ -3,6 +3,7 @@ import tempfile
 import uuid
 import shutil
 import math
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path, PurePosixPath
 
@@ -115,6 +116,37 @@ def _s3_filename(key: str, fallback_doc_id: str) -> str:
     return filename or f"Document {fallback_doc_id}"
 
 
+def _sanitize_document_name(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", (value or "")).strip()
+    cleaned = re.sub(r"[\\/*?\"<>|]", "", cleaned)
+    return cleaned[:120]
+
+
+def _sanitize_document_part(value: str) -> str:
+    cleaned = _sanitize_document_name(value)
+    return cleaned[:80]
+
+
+def _split_name_parts(value: str) -> tuple[str, str]:
+    normalized = _sanitize_document_name(value)
+    if " - " not in normalized:
+        return "", ""
+
+    left, right = normalized.split(" - ", 1)
+    left = _sanitize_document_part(left)
+    right = _sanitize_document_part(right)
+    if not left or not right:
+        return "", ""
+    return left, right
+
+
+def _download_filename(name: str) -> str:
+    trimmed = (name or "").strip()
+    if not trimmed:
+        return "document.pdf"
+    return trimmed if trimmed.lower().endswith(".pdf") else f"{trimmed}.pdf"
+
+
 def _normalize_positive_int(value, default: int) -> int:
     try:
         parsed = int(value)
@@ -145,7 +177,14 @@ def save_to_s3_temp(latex: str, template: str) -> str:
     return url
 
 
-def save_to_firestore(uid: str, latex: str, template: str) -> tuple[str, str]:
+def save_to_firestore(
+    uid: str,
+    latex: str,
+    template: str,
+    document_name: str = "",
+    company_name: str = "",
+    position_name: str = "",
+) -> tuple[str, str]:
     """Compile LaTeX to PDF, upload to S3 users/, and save user document metadata to Firestore."""
     pdf_bytes = _compile_latex_to_pdf(latex)
 
@@ -167,7 +206,22 @@ def save_to_firestore(uid: str, latex: str, template: str) -> tuple[str, str]:
     )
 
     db = firestore.client()
+    normalized_name = _sanitize_document_name(document_name)
+    normalized_company = _sanitize_document_part(company_name)
+    normalized_position = _sanitize_document_part(position_name)
+
+    if (not normalized_company or not normalized_position) and normalized_name:
+        fallback_company, fallback_position = _split_name_parts(normalized_name)
+        normalized_company = normalized_company or fallback_company
+        normalized_position = normalized_position or fallback_position
+
+    if normalized_company and normalized_position:
+        normalized_name = _sanitize_document_name(f"{normalized_company} - {normalized_position}")
+
     _, doc_ref = db.collection("users").document(uid).collection("resumes").add({
+        "name": normalized_name,
+        "company_name": normalized_company,
+        "position_name": normalized_position,
         "template": template,
         "s3_key": key,
         "created_at": _format_timestamp(created_at),
@@ -178,7 +232,14 @@ def save_to_firestore(uid: str, latex: str, template: str) -> tuple[str, str]:
     return doc_ref.id, pdf_url
 
 
-def save_guest_to_firestore(guest_id: str, latex: str, template: str) -> tuple[str, str]:
+def save_guest_to_firestore(
+    guest_id: str,
+    latex: str,
+    template: str,
+    document_name: str = "",
+    company_name: str = "",
+    position_name: str = "",
+) -> tuple[str, str]:
     """Compile LaTeX to PDF, upload to S3 guests/, and save guest metadata in Firestore."""
     pdf_bytes = _compile_latex_to_pdf(latex)
 
@@ -200,7 +261,22 @@ def save_guest_to_firestore(guest_id: str, latex: str, template: str) -> tuple[s
     )
 
     db = firestore.client()
+    normalized_name = _sanitize_document_name(document_name)
+    normalized_company = _sanitize_document_part(company_name)
+    normalized_position = _sanitize_document_part(position_name)
+
+    if (not normalized_company or not normalized_position) and normalized_name:
+        fallback_company, fallback_position = _split_name_parts(normalized_name)
+        normalized_company = normalized_company or fallback_company
+        normalized_position = normalized_position or fallback_position
+
+    if normalized_company and normalized_position:
+        normalized_name = _sanitize_document_name(f"{normalized_company} - {normalized_position}")
+
     _, doc_ref = db.collection("guests").document(guest_id).collection("documents").add({
+        "name": normalized_name,
+        "company_name": normalized_company,
+        "position_name": normalized_position,
         "template": template,
         "s3_key": key,
         "created_at": _format_timestamp(created_at),
@@ -239,27 +315,41 @@ def list_user_documents(uid: str, page=DEFAULT_STORAGE_PAGE, page_size=DEFAULT_S
 
         s3_key = payload.get("s3_key", "")
         expired = expired or not bool(s3_key)
-        name = _s3_filename(s3_key, doc.id)
+        name = _sanitize_document_name(payload.get("name", "")) or _s3_filename(s3_key, doc.id)
+        company_name = _sanitize_document_part(payload.get("company_name", ""))
+        position_name = _sanitize_document_part(payload.get("position_name", ""))
+
+        if (not company_name or not position_name) and name:
+            fallback_company, fallback_position = _split_name_parts(name)
+            company_name = company_name or fallback_company
+            position_name = position_name or fallback_position
+
+        if not company_name:
+            company_name = name
+
         view_url = None
         download_url = None
 
         if not expired and s3_key:
+            filename = _download_filename(name)
             view_url = _generate_presigned_get_url(
                 s3,
                 s3_key,
                 expires_in=ACTIVE_STORAGE_LINK_TTL_SECONDS,
-                content_disposition=f'inline; filename="{name}"',
+                content_disposition=f'inline; filename="{filename}"',
             )
             download_url = _generate_presigned_get_url(
                 s3,
                 s3_key,
                 expires_in=ACTIVE_STORAGE_LINK_TTL_SECONDS,
-                content_disposition=f'attachment; filename="{name}"',
+                content_disposition=f'attachment; filename="{filename}"',
             )
 
         record = {
             "id": doc.id,
             "name": name,
+            "company_name": company_name,
+            "position_name": position_name,
             "kind": payload.get("kind", "resume"),
             "template": payload.get("template", ""),
             "mode": payload.get("mode", "user"),

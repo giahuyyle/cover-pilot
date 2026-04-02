@@ -208,3 +208,42 @@ class GeneratorServicesTests(SimpleTestCase):
         )
         self.assertEqual(latex, VALID_JAKES_SNIPPETS)
         openai_mock.assert_called_once()
+
+    @patch("apps.generator.services._extract_company_position_with_gpt5", return_value=("Acme Inc", "Backend Engineer"))
+    def test_summarize_document_name_uses_gpt5_output(self, gpt5_mock):
+        name = services.summarize_document_name("Any job description")
+        self.assertEqual(name, "Acme Inc - Backend Engineer")
+        gpt5_mock.assert_called_once()
+
+    @patch(
+        "apps.generator.services._extract_company_position_with_gpt5",
+        return_value=(
+            "another term, depending on performance and mutual interest",
+            "passionate and well-rounded candidate to join Diligent",
+        ),
+    )
+    def test_summarize_document_name_rejects_sentence_like_fragments(self, gpt5_mock):
+        name = services.summarize_document_name("Any job description")
+        self.assertEqual(name, "Unknown Company - Unknown Position")
+        gpt5_mock.assert_called_once()
+
+    @patch("apps.generator.services._extract_company_position_with_gpt5", return_value=("", ""))
+    def test_summarize_document_name_falls_back_to_pattern_extraction(self, gpt5_mock):
+        name = services.summarize_document_name(
+            "Company: Orbit Labs\n"
+            "Position: Machine Learning Engineer\n"
+            "Responsibilities include model development."
+        )
+        self.assertEqual(name, "Orbit Labs - Machine Learning Engineer")
+        gpt5_mock.assert_called_once()
+
+    @patch("apps.generator.services._extract_company_position_with_gpt5", return_value=("", ""))
+    def test_summarize_document_identity_returns_split_parts(self, gpt5_mock):
+        company, position, name = services.summarize_document_identity(
+            "Company: Diligent\n"
+            "Title: AI Platform Intern\n"
+        )
+        self.assertEqual(company, "Diligent")
+        self.assertEqual(position, "AI Platform Intern")
+        self.assertEqual(name, "Diligent - AI Platform Intern")
+        gpt5_mock.assert_called_once()

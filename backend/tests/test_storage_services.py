@@ -36,6 +36,9 @@ class StorageServicesTests(SimpleTestCase):
                 "created_at": created_expired.isoformat(),
             }),
             _FakeDoc("new", {
+                "name": "Acme Corp - Software Engineer",
+                "company_name": "Acme Corp",
+                "position_name": "Software Engineer",
                 "template": "modern",
                 "s3_key": "users/uid-1/new.pdf",
                 "created_at": created_new.isoformat(),
@@ -71,7 +74,9 @@ class StorageServicesTests(SimpleTestCase):
         self.assertFalse(documents[0]["expired"])
         self.assertEqual(documents[0]["view_url"], "https://example.com/new/view")
         self.assertEqual(documents[0]["download_url"], "https://example.com/new/download")
-        self.assertEqual(documents[0]["name"], "new.pdf")
+        self.assertEqual(documents[0]["name"], "Acme Corp - Software Engineer")
+        self.assertEqual(documents[0]["company_name"], "Acme Corp")
+        self.assertEqual(documents[0]["position_name"], "Software Engineer")
 
         self.assertFalse(documents[1]["expired"])
         expected_legacy_expiry = created_legacy + timedelta(seconds=USER_DOC_TTL_SECONDS)
@@ -82,11 +87,15 @@ class StorageServicesTests(SimpleTestCase):
         self.assertEqual(documents[1]["view_url"], "https://example.com/legacy/view")
         self.assertEqual(documents[1]["download_url"], "https://example.com/legacy/download")
         self.assertEqual(documents[1]["name"], "legacy.pdf")
+        self.assertEqual(documents[1]["company_name"], "legacy.pdf")
+        self.assertEqual(documents[1]["position_name"], "")
 
         self.assertTrue(documents[2]["expired"])
         self.assertNotIn("view_url", documents[2])
         self.assertNotIn("download_url", documents[2])
         self.assertEqual(documents[2]["name"], "expired.pdf")
+        self.assertEqual(documents[2]["company_name"], "expired.pdf")
+        self.assertEqual(documents[2]["position_name"], "")
 
         self.assertEqual(s3.generate_presigned_url.call_count, 4)
 
@@ -158,3 +167,31 @@ class StorageServicesTests(SimpleTestCase):
         self.assertEqual(clamped_pagination["page"], 2)
         self.assertEqual(clamped_pagination["total_pages"], 2)
         self.assertFalse(clamped_pagination["has_next"])
+
+    @patch("apps.generator.storage._s3_client")
+    @patch("apps.generator.storage.firestore.client")
+    def test_list_user_documents_safely_splits_legacy_hyphen_name(self, firestore_client_mock, s3_client_mock):
+        now = datetime.now(timezone.utc)
+        docs = [
+            _FakeDoc("doc-1", {
+                "name": "Orbit Labs - AI Platform Intern",
+                "template": "classic",
+                "s3_key": "users/uid-1/doc-1.pdf",
+                "created_at": now.isoformat(),
+                "expires_at": (now + timedelta(hours=1)).isoformat(),
+            }),
+        ]
+
+        db = MagicMock()
+        firestore_client_mock.return_value = db
+        db.collection.return_value.document.return_value.collection.return_value.stream.return_value = docs
+
+        s3 = MagicMock()
+        s3.generate_presigned_url.side_effect = ["https://example.com/view", "https://example.com/download"]
+        s3_client_mock.return_value = s3
+
+        result = list_user_documents("uid-1")
+        row = result["documents"][0]
+        self.assertEqual(row["name"], "Orbit Labs - AI Platform Intern")
+        self.assertEqual(row["company_name"], "Orbit Labs")
+        self.assertEqual(row["position_name"], "AI Platform Intern")

@@ -1,6 +1,7 @@
 import anthropic
 import pdfplumber
 import re
+import json
 from pathlib import Path
 from django.conf import settings
 from openai import OpenAI
@@ -59,6 +60,32 @@ SUPPORTED_PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
     "anthropic": ("claude-sonnet-4-5", "claude-sonnet-4-6"),
 }
 
+DOCUMENT_NAME_MODEL = "gpt-5"
+DEFAULT_DOCUMENT_COMPANY = "Unknown Company"
+DEFAULT_DOCUMENT_POSITION = "Unknown Position"
+MAX_DOCUMENT_NAME_PART_LENGTH = 80
+MAX_DOCUMENT_NAME_PART_WORDS = 10
+DISALLOWED_DOCUMENT_NAME_PHRASES: tuple[str, ...] = (
+    "depending on",
+    "candidate to join",
+    "candidate will",
+    "we are seeking",
+    "key responsibilities",
+    "responsibilities include",
+    "work as part of",
+    "opportunity to",
+)
+DOCUMENT_NAME_SYSTEM_PROMPT = (
+    "Extract the hiring company and job position from a job description.\n"
+    "Return strict JSON only with keys: company, position.\n"
+    "Rules:\n"
+    "- company is only the employer name.\n"
+    "- position is only the role title.\n"
+    "- Keep each value concise and title-like.\n"
+    "- Do not include sentence fragments, requirements, perks, or responsibilities.\n"
+    "- If unknown, return an empty string."
+)
+
 
 def supported_provider_models() -> dict[str, tuple[str, ...]]:
     return SUPPORTED_PROVIDER_MODELS
@@ -66,6 +93,163 @@ def supported_provider_models() -> dict[str, tuple[str, ...]]:
 
 def is_supported_provider_model(provider: str, model: str) -> bool:
     return model in SUPPORTED_PROVIDER_MODELS.get(provider, ())
+
+
+def _clean_name_part(value: str, fallback: str) -> str:
+    cleaned = re.sub(r"\s+", " ", (value or "")).strip()
+    cleaned = cleaned.strip("-|:;,.")
+    cleaned = re.sub(r"[\\/*?\"<>|]", "", cleaned)
+    if not cleaned:
+        return fallback
+    return cleaned[:MAX_DOCUMENT_NAME_PART_LENGTH]
+
+
+def _looks_like_sentence_fragment(value: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (value or "")).strip()
+    if not normalized:
+        return False
+
+    lower = normalized.lower()
+    if any(phrase in lower for phrase in DISALLOWED_DOCUMENT_NAME_PHRASES):
+        return True
+
+    if re.search(r"[.!?]", normalized):
+        return True
+
+    word_count = len(re.findall(r"[A-Za-z0-9&/+\-'.]+", normalized))
+    if word_count > MAX_DOCUMENT_NAME_PART_WORDS:
+        return True
+
+    if len(normalized) > MAX_DOCUMENT_NAME_PART_LENGTH:
+        return True
+
+    if normalized.count(",") >= 1 and word_count >= 6:
+        return True
+
+    if re.search(r"\b(?:is|are|will|should|must|depending)\b", lower):
+        return True
+
+    connectors = len(re.findall(r"\b(?:and|or|with|including)\b", lower))
+    if connectors >= 2 and word_count >= 7:
+        return True
+
+    return False
+
+
+def _clean_document_name_part(value: str) -> str:
+    cleaned = _clean_name_part(value, "")
+    if not cleaned:
+        return ""
+    if _looks_like_sentence_fragment(cleaned):
+        return ""
+    return cleaned
+
+
+def _extract_json_object(text: str) -> dict:
+    normalized = (text or "").strip()
+    if not normalized:
+        return {}
+
+    try:
+        parsed = json.loads(normalized)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\{.*\}", normalized, flags=re.DOTALL)
+    if not match:
+        return {}
+
+    try:
+        parsed = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return {}
+
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _extract_company_position_with_patterns(job_description: str) -> tuple[str, str]:
+    text = (job_description or "").strip()
+    if not text:
+        return "", ""
+
+    company_patterns = (
+        r"(?im)^\s*(?:company|organization|employer|hiring company|company name)\s*[:\-]\s*(.+)$",
+    )
+    position_patterns = (
+        r"(?im)^\s*(?:position|job title|title|role|role title)\s*[:\-]\s*(.+)$",
+    )
+
+    company = ""
+    position = ""
+
+    for pattern in company_patterns:
+        match = re.search(pattern, text)
+        if match:
+            company = (match.group(1) or "").strip()
+            break
+
+    for pattern in position_patterns:
+        match = re.search(pattern, text)
+        if match:
+            position = (match.group(1) or "").strip()
+            break
+
+    return company, position
+
+
+def _extract_company_position_with_gpt5(job_description: str) -> tuple[str, str]:
+    if not settings.OPENAI_API_KEY:
+        return "", ""
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    response = client.responses.create(
+        model=DOCUMENT_NAME_MODEL,
+        max_output_tokens=120,
+        input=[
+            {"role": "system", "content": DOCUMENT_NAME_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    "Job description:\n"
+                    f"{job_description}\n\n"
+                    "Return JSON only in the format: "
+                    '{"company":"...","position":"..."}'
+                ),
+            },
+        ],
+    )
+    payload = _extract_json_object(_extract_openai_text(response))
+    return str(payload.get("company", "") or ""), str(payload.get("position", "") or "")
+
+
+def summarize_document_identity(job_description: str) -> tuple[str, str, str]:
+    company = ""
+    position = ""
+
+    try:
+        company, position = _extract_company_position_with_gpt5(job_description)
+    except Exception:
+        company = ""
+        position = ""
+
+    company = _clean_document_name_part(company)
+    position = _clean_document_name_part(position)
+
+    if not company or not position:
+        fallback_company, fallback_position = _extract_company_position_with_patterns(job_description)
+        company = company or _clean_document_name_part(fallback_company)
+        position = position or _clean_document_name_part(fallback_position)
+
+    company = company or DEFAULT_DOCUMENT_COMPANY
+    position = position or DEFAULT_DOCUMENT_POSITION
+    return company, position, f"{company} - {position}"
+
+
+def summarize_document_name(job_description: str) -> str:
+    _, _, document_name = summarize_document_identity(job_description)
+    return document_name
 
 
 def extract_pdf_text(pdf_file) -> str:

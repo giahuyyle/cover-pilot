@@ -128,11 +128,18 @@ export default function Storage() {
 
                 {!loading && !error && documents.map((doc) => {
                     const isExpired = Boolean(doc.expired);
+                    const companyName = (doc.company_name || "").trim();
+                    const positionName = (doc.position_name || "").trim();
+                    const displayCompany = companyName || doc.name || `Document ${doc.id}`;
+                    const displayPosition = positionName;
 
                     return (
                         <div key={doc.id} className="grid grid-cols-12 gap-4 px-4 py-4 border-b border-border last:border-b-0 items-center">
                             <div className="col-span-4 min-w-0">
-                                <div className="font-medium truncate">{doc.name || `Document ${doc.id}`}</div>
+                                <div className="font-medium truncate">{displayCompany}</div>
+                                {displayPosition && (
+                                    <div className="text-sm text-muted-foreground truncate">{displayPosition}</div>
+                                )}
                                 <div className="text-xs text-muted-foreground">Expires: {formatDateTime(doc.expires_at)}</div>
                             </div>
 

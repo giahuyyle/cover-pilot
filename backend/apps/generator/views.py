@@ -10,6 +10,7 @@ from .serializers import ResumeGenerationSerializer
 from .services import (
     is_supported_provider_model,
     process_resume_request,
+    summarize_document_identity,
     supported_provider_models,
 )
 from .storage import save_to_s3_temp, save_to_firestore, save_guest_to_firestore
@@ -56,13 +57,21 @@ class GenerateResumeView(APIView):
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
+        company_name, position_name, document_name = summarize_document_identity(data.get("job_description", ""))
         uid = request.user.get("uid") if isinstance(request.user, dict) else None
 
         try:
             if uid:
-                doc_id, pdf_url = save_to_firestore(uid, latex, template)
+                doc_id, pdf_url = save_to_firestore(
+                    uid,
+                    latex,
+                    template,
+                    document_name=document_name,
+                    company_name=company_name,
+                    position_name=position_name,
+                )
                 return Response(
-                    {"pdf_url": pdf_url, "template": template, "mode": "user", "doc_id": doc_id},
+                    {"pdf_url": pdf_url, "template": template, "mode": "user", "doc_id": doc_id, "document_name": document_name},
                     status=status.HTTP_200_OK,
                 )
 
@@ -72,15 +81,22 @@ class GenerateResumeView(APIView):
                 or request.query_params.get("guest_id", "")
             )
             if guest_id:
-                doc_id, pdf_url = save_guest_to_firestore(guest_id, latex, template)
+                doc_id, pdf_url = save_guest_to_firestore(
+                    guest_id,
+                    latex,
+                    template,
+                    document_name=document_name,
+                    company_name=company_name,
+                    position_name=position_name,
+                )
                 return Response(
-                    {"pdf_url": pdf_url, "template": template, "mode": "guest", "doc_id": doc_id},
+                    {"pdf_url": pdf_url, "template": template, "mode": "guest", "doc_id": doc_id, "document_name": document_name},
                     status=status.HTTP_200_OK,
                 )
 
             pdf_url = save_to_s3_temp(latex, template)
             return Response(
-                {"pdf_url": pdf_url, "template": template, "mode": "guest"},
+                {"pdf_url": pdf_url, "template": template, "mode": "guest", "document_name": document_name},
                 status=status.HTTP_200_OK,
             )
         except FileNotFoundError as exc:
