@@ -1,7 +1,14 @@
 // src/lib/api.js
 import { auth } from "@/lib/firebase";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const APP_MODE = String(
+    import.meta.env.VITE_APP_MODE || import.meta.env.MODE || "development"
+).toLowerCase();
+const IS_PROD_MODE = APP_MODE === "prod" || APP_MODE === "production";
+const API_URL =
+    (IS_PROD_MODE ? import.meta.env.VITE_PROD_API_URL : import.meta.env.VITE_DEV_API_URL) ||
+    import.meta.env.VITE_API_URL ||
+    "";
 const GUEST_ID_STORAGE_KEY = "coverpilot_guest_id";
 
 function createGuestId() {
