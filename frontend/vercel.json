@@ -1,4 +1,10 @@
 {
+    "rewrites": [
+        {
+            "source": "/((?!assets/|auth/|landing/|logo.svg|logo-transparent.svg|favicon.ico).*)",
+            "destination": "/index.html"
+        }
+    ],
     "headers": [
         {
             "source": "/(.*)",
