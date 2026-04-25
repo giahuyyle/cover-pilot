@@ -115,6 +115,21 @@ cp .env.example .env
 python manage.py runserver
 ```
 
+## Docker
+
+Run the backend from the repository root:
+
+```bash
+docker compose build backend
+docker compose up backend
+```
+
+The backend will be available at `http://localhost:8000`.
+
+Notes:
+- The image installs TeX packages required for runtime PDF generation (`pdflatex` + common LaTeX packages).
+- `serviceAccountKey.json` is excluded from the build context; provide Firebase credentials via `FIREBASE_CREDENTIALS_JSON` or a runtime-mounted file.
+
 ---
 
 ## Environment Variables

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+.env
+.env.*
+serviceAccountKey.json
+
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+.idea/
+.git/

@@ -104,6 +104,23 @@ npm run dev
 
 Frontend default URL: `http://localhost:5173`
 
+## Docker (Backend Only)
+
+The backend can be run in Docker with TeX dependencies preinstalled. The frontend remains a separate static app.
+
+```bash
+# from repo root
+docker compose build backend
+docker compose up backend
+```
+
+Backend URL in this setup: `http://localhost:8000`
+
+Notes:
+- `backend/serviceAccountKey.json` is excluded from Docker build context for security.
+- Use `FIREBASE_CREDENTIALS_JSON` in `backend/.env` (or mount credentials at runtime) for Firebase auth flows in containers.
+- Point frontend production env to the backend container URL with `VITE_PROD_API_URL`.
+
 ## Common Scripts
 
 ### Frontend (`frontend/`)
