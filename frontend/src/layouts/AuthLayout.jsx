@@ -2,9 +2,9 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { auth } from "@/lib/firebase";
 import { apiFetch } from "@/lib/api";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, browserLocalPersistence, browserSessionPersistence, setPersistence, fetchSignInMethodsForEmail, sendPasswordResetEmail } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, browserLocalPersistence, browserSessionPersistence, setPersistence, fetchSignInMethodsForEmail, sendPasswordResetEmail } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const loginDetails = {
     text: "Welcome back!",
@@ -99,15 +99,11 @@ export default function AuthLayout({ isLogin = true }) {
     const [authError, setAuthError] = useState(null);
     const [authMessage, setAuthMessage] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [checkingRedirect, setCheckingRedirect] = useState(true);
     const [user] = useAuthState(auth);
     const navigate = useNavigate();
 
-    // Redirect to dashboard if already signed in
-    useEffect(() => {
-        if (user) navigate("/dashboard");
-    }, [user, navigate]);
-
-    const syncUserProfileToBackend = async (firebaseUser, fullNameOverride = "") => {
+    const syncUserProfileToBackend = useCallback(async (firebaseUser, fullNameOverride = "") => {
         if (!firebaseUser) return;
 
         const normalizedFullName = (fullNameOverride || firebaseUser.displayName || "").trim();
@@ -126,7 +122,37 @@ export default function AuthLayout({ isLogin = true }) {
             // Do not block login/signup when profile sync fails.
             console.error("Failed to sync user profile to backend:", error);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const completeRedirectSignIn = async () => {
+            try {
+                const result = await getRedirectResult(auth);
+
+                if (result?.user) {
+                    await syncUserProfileToBackend(result.user);
+                    navigate("/dashboard", { replace: true });
+                }
+            } catch (error) {
+                if (isMounted) setAuthError(error.message);
+            } finally {
+                if (isMounted) setCheckingRedirect(false);
+            }
+        };
+
+        completeRedirectSignIn();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [navigate, syncUserProfileToBackend]);
+
+    // Redirect to dashboard if already signed in
+    useEffect(() => {
+        if (!checkingRedirect && user) navigate("/dashboard");
+    }, [checkingRedirect, user, navigate]);
 
     const onSubmit = async (data) => {
         setAuthError(null);
@@ -184,6 +210,12 @@ export default function AuthLayout({ isLogin = true }) {
             await syncUserProfileToBackend(result.user);
             navigate("/dashboard");
         } catch (error) {
+            if (error.code === "auth/popup-blocked") {
+                const provider = new GoogleAuthProvider();
+                await signInWithRedirect(auth, provider);
+                return;
+            }
+
             setAuthError(error.message);
         } finally {
             setLoading(false);
