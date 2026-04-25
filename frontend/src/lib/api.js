@@ -69,7 +69,7 @@ export async function apiFetch(path, options = {}) {
 // Multipart/form-data upload helper; do not set Content-Type so the browser adds the boundary
 export async function apiUpload(path, formData, options = {}) {
     const token = await auth.currentUser?.getIdToken();
-    const { path: resolvedPath, guestId } = resolveGuestRequest(path, token);
+    const { path: resolvedPath } = resolveGuestRequest(path, token);
 
     const res = await fetch(`${API_URL}${resolvedPath}`, {
         method: "POST",
@@ -78,7 +78,6 @@ export async function apiUpload(path, formData, options = {}) {
         headers: {
             ...(options.headers || {}),
             ...(token && { Authorization: `Bearer ${token}` }),
-            ...(!token && guestId && { "X-Guest-Id": guestId }),
             // Intentionally omit Content-Type
         },
     });

@@ -149,6 +149,36 @@ class GenerateResumeApiTests(SimpleTestCase):
         save_temp_mock.assert_not_called()
         process_mock.assert_called_once()
 
+    @patch("apps.generator.views.save_to_s3_temp")
+    @patch("apps.generator.views.save_guest_to_firestore", return_value=("guest-doc-1", "https://example.com/guest.pdf"))
+    @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
+    def test_post_guest_with_query_guest_id_stores_guest_document(self, process_mock, save_guest_mock, save_temp_mock):
+        pdf = SimpleUploadedFile("resume.pdf", b"%PDF-1.4 test", content_type="application/pdf")
+        request = self.factory.post(
+            "/api/generate/openai/gpt-5.4-mini/?guest_id=guest-query",
+            {
+                "template": "classic",
+                "pdf": pdf,
+                "job_description": "Job description text",
+            },
+            format="multipart",
+        )
+
+        response = self.view(request, provider="openai", model="gpt-5.4-mini")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["mode"], "guest")
+        self.assertEqual(response.data["doc_id"], "guest-doc-1")
+        save_guest_mock.assert_called_once_with(
+            "guest-query",
+            "latex",
+            "classic",
+            document_name="Acme Corp - Software Engineer",
+            company_name="Acme Corp",
+            position_name="Software Engineer",
+        )
+        save_temp_mock.assert_not_called()
+        process_mock.assert_called_once()
+
     @patch("apps.generator.views.save_to_s3_temp", return_value="https://example.com/guest-temp.pdf")
     @patch("apps.generator.views.save_guest_to_firestore")
     @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
