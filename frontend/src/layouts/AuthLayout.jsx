@@ -93,6 +93,13 @@ const registerDetails = {
     question: <h2 className="text-center mt-5 text-sm">Already has an account? <a href="/login" className="text-[rgb(108,144,46)] hover:underline">Sign In</a></h2>,
 }
 
+let redirectResultPromise;
+
+const getSharedRedirectResult = () => {
+    redirectResultPromise ||= getRedirectResult(auth);
+    return redirectResultPromise;
+};
+
 export default function AuthLayout({ isLogin = true }) {
     const details = isLogin ? loginDetails : registerDetails;
     const { register, handleSubmit, watch, getValues, formState: { errors } } = useForm();
@@ -129,7 +136,7 @@ export default function AuthLayout({ isLogin = true }) {
 
         const completeRedirectSignIn = async () => {
             try {
-                const result = await getRedirectResult(auth);
+                const result = await getSharedRedirectResult();
 
                 if (result?.user) {
                     await syncUserProfileToBackend(result.user);

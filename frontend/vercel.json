@@ -1,6 +1,10 @@
 {
     "rewrites": [
         {
+            "source": "/__/auth/:path*",
+            "destination": "https://cover-pilot-backend.firebaseapp.com/__/auth/:path*"
+        },
+        {
             "source": "/((?!assets/|auth/|landing/|logo.svg|logo-transparent.svg|favicon.ico).*)",
             "destination": "/index.html"
         }
