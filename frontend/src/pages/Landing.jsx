@@ -156,7 +156,7 @@ function ProductPreview() {
                             ["UX Researcher Packet", "CL", "Draft"],
                         ].map(([name, type, status]) => (
                             <div key={name} className="grid grid-cols-[1fr_76px_84px] items-center border-b border-[#eee8dc] px-4 py-3 text-xs last:border-b-0">
-                                <span className="truncate font-medium text-zinc-850">{name}</span>
+                                <span className="truncate font-medium text-zinc-900">{name}</span>
                                 <span className="w-fit rounded bg-[#e5ecd8] px-2 py-1 font-semibold text-[#53621e]">{type}</span>
                                 <span className="text-zinc-600">{status}</span>
                             </div>

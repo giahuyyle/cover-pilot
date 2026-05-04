@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FileCheck2, FileText, Loader2, PanelRightOpen, Sparkles, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -62,6 +63,18 @@ function validateResumeFile(file) {
     return "";
 }
 
+function FieldLabel({ children }) {
+    return <label className="text-sm font-semibold text-zinc-900">{children}</label>;
+}
+
+function FormPanel({ children, className = "" }) {
+    return (
+        <section className={`rounded-xl border border-[#ded7c8] bg-[#fffdf8] shadow-[0_18px_55px_rgba(32,31,22,0.06)] ${className}`}>
+            {children}
+        </section>
+    );
+}
+
 export default function Generator() {
     const [user, authLoading] = useAuthState(auth);
     const [template, setTemplate] = useState(TEMPLATES[0].value);
@@ -89,10 +102,10 @@ export default function Generator() {
     const hasResult = Boolean(resultUrl);
     const showPreview = hasResult && isPreviewOpen;
 
-    const handleFileChange = (e) => {
-        const selectedFile = e.target.files?.[0] || null;
-
+    const handleFileChange = (event) => {
+        const selectedFile = event.target.files?.[0] || null;
         const fileError = validateResumeFile(selectedFile);
+
         if (fileError) {
             setFile(null);
             setFileInputKey((prev) => prev + 1);
@@ -116,8 +129,8 @@ export default function Generator() {
         setModel(nextModels[0]?.value || "");
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
         setError("");
         setResultUrl("");
         setIsPreviewOpen(false);
@@ -158,217 +171,259 @@ export default function Generator() {
         }
     };
 
-    const handleClosePreview = () => {
-        setIsPreviewOpen(false);
-    };
-
-    const handleOpenPreview = () => {
-        if (!resultUrl) return;
-        setViewerFailed(false);
-        setIsPreviewOpen(true);
-    };
-
     return (
-        <div className="mx-auto max-w-368 px-6 pb-24">
-            <div className="flex flex-col gap-6 lg:gap-10 xl:gap-12 lg:flex-row lg:items-start">
-                <section
-                    className={`w-full transition-all duration-500 ease-out motion-reduce:transition-none ${
-                        showPreview ? "lg:w-[44%]" : "lg:w-full"
-                    }`}
-                >
-                    <div
-                        className={`transition-all duration-500 ease-out motion-reduce:transition-none ${
-                            showPreview ? "max-w-none" : "mx-auto max-w-4xl"
-                        }`}
-                    >
-                        <header className="mb-8">
-                            <p className="text-sm font-mono mb-1 text-[rgb(108,144,46)]">{`{ generator }`}</p>
-                            <h1 className="text-3xl font-bold">Generate Tailored Resume</h1>
-                            <p className="text-muted-foreground">Upload your resume PDF, choose a template, paste the job description, pick a model, and generate.</p>
-                            {isGuest && (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Guest mode uses a default AI model. Login or sign up to unlock full provider and model choice.
-                                </p>
-                            )}
-                        </header>
+        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+            <header className="mb-8 grid gap-6 border-b border-[#e3dece] pb-6 lg:grid-cols-[1fr_360px] lg:items-end">
+                <div>
+                    <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Generate application packet</h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
+                        Upload your resume, paste the role, choose a template, and generate a tailored document for your next application.
+                    </p>
+                    {isGuest && (
+                        <p className="mt-3 max-w-2xl rounded-md border border-[#e5dfd0] bg-[#fffdf8] px-3 py-2 text-sm text-zinc-600">
+                            Guest mode uses the default OpenAI model. Sign in to unlock provider and model selection.
+                        </p>
+                    )}
+                </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className={`grid gap-4 ${isGuest ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
+                <FormPanel className="p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex size-11 items-center justify-center rounded-md bg-[#eef2d8] text-[#5d681c]">
+                            <FileCheck2 className="size-5" strokeWidth={1.8} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-zinc-950">Packet readiness</p>
+                            <p className="text-xs text-zinc-600">
+                                {file ? "Resume attached" : "Waiting for resume"}
+                                {" | "}
+                                {jobDesc.trim() ? "Role added" : "Role needed"}
+                            </p>
+                        </div>
+                    </div>
+                </FormPanel>
+            </header>
+
+            <div className={`grid gap-6 ${showPreview ? "xl:grid-cols-[0.82fr_1.18fr]" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
+                <FormPanel className="p-5 lg:p-6">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className={`grid gap-4 ${isGuest ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
+                            <div className="space-y-2">
+                                <FieldLabel>Template</FieldLabel>
+                                <Select value={template} onValueChange={setTemplate}>
+                                    <SelectTrigger className="h-11 w-full border-[#d9d2c2] bg-white">
+                                        <SelectValue placeholder="Select template" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {TEMPLATES.map((item) => (
+                                            <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {!isGuest && (
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Template</label>
-                                    <Select value={template} onValueChange={setTemplate}>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select template" />
+                                    <FieldLabel>AI Provider</FieldLabel>
+                                    <Select value={provider} onValueChange={handleProviderChange}>
+                                        <SelectTrigger className="h-11 w-full border-[#d9d2c2] bg-white">
+                                            <SelectValue placeholder="Select provider" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {TEMPLATES.map((t) => (
-                                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                            {PROVIDERS.map((item) => (
+                                                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
-
-                                {!isGuest && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">AI Provider</label>
-                                        <Select value={provider} onValueChange={handleProviderChange}>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select provider" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {PROVIDERS.map((p) => (
-                                                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-
-                                {!isGuest && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">AI Model</label>
-                                        <Select value={model} onValueChange={setModel}>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select model" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {availableModels.map((m) => (
-                                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Resume (PDF)</label>
-                                <Input
-                                    key={fileInputKey}
-                                    id="resume-upload"
-                                    type="file"
-                                    accept="application/pdf"
-                                    onChange={handleFileChange}
-                                    className="sr-only"
-                                />
-                                <div className="flex flex-wrap items-center gap-3 rounded-md border border-input px-3 py-2">
-                                    <label
-                                        htmlFor="resume-upload"
-                                        className="inline-flex h-10 cursor-pointer items-center rounded-md bg-black px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-black/90 hover:shadow-md hover:-translate-y-0.5"
-                                    >
-                                        Choose File
-                                    </label>
-                                    <p className="text-sm text-muted-foreground">
-                                        {file ? file.name : "No file selected"}
-                                    </p>
-                                    {file && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-9"
-                                            onClick={handleRemoveFile}
-                                        >
-                                            Remove
-                                        </Button>
-                                    )}
-                                </div>
-                                <p className="text-xs text-muted-foreground">Max 10MB. PDF only.</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Job Description</label>
-                                <textarea
-                                    className="w-full min-h-40 rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring"
-                                    placeholder="Paste the job description here..."
-                                    value={jobDesc}
-                                    onChange={(e) => setJobDesc(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Extra Instructions (Optional)</label>
-                                <textarea
-                                    className="w-full min-h-24 rounded-md border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring"
-                                    placeholder='Example: Make up some bulletpoints to better match the job description.'
-                                    value={extraInstructions}
-                                    onChange={(e) => setExtraInstructions(e.target.value)}
-                                />
-                            </div>
-
-                            {error && (
-                                <div className="text-sm text-red-600">{error}</div>
                             )}
 
-                            <div className="flex flex-wrap items-center gap-3">
-                                <Button type="submit" className="h-10 px-6 rounded-full" disabled={loading}>
-                                    {loading ? "Generating..." : "Send"}
-                                </Button>
-                                {hasResult && !showPreview && (
-                                    <Button type="button" variant="outline" className="h-10" onClick={handleOpenPreview}>
-                                        Show Preview
-                                    </Button>
-                                )}
-                                {hasResult && !showPreview && (
-                                    <Button asChild variant="link" className="h-10 px-0">
-                                        <a href={resultUrl} target="_blank" rel="noreferrer">Open in new tab</a>
+                            {!isGuest && (
+                                <div className="space-y-2">
+                                    <FieldLabel>AI Model</FieldLabel>
+                                    <Select value={model} onValueChange={setModel}>
+                                        <SelectTrigger className="h-11 w-full border-[#d9d2c2] bg-white">
+                                            <SelectValue placeholder="Select model" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableModels.map((item) => (
+                                                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <FieldLabel>Resume PDF</FieldLabel>
+                            <Input
+                                key={fileInputKey}
+                                id="resume-upload"
+                                type="file"
+                                accept="application/pdf"
+                                onChange={handleFileChange}
+                                className="sr-only"
+                            />
+                            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-[#cfc7b7] bg-[#faf8f1] p-4">
+                                <label
+                                    htmlFor="resume-upload"
+                                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md bg-[#5d681c] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
+                                >
+                                    <Upload className="size-4" strokeWidth={1.8} />
+                                    Choose PDF
+                                </label>
+                                <p className="min-w-0 flex-1 truncate text-sm text-zinc-600">
+                                    {file ? file.name : "No file selected"}
+                                </p>
+                                {file && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-md border-[#cfc7b7] bg-white"
+                                        onClick={handleRemoveFile}
+                                    >
+                                        <X className="size-4" strokeWidth={1.8} />
+                                        Remove
                                     </Button>
                                 )}
                             </div>
-                        </form>
-                    </div>
-                </section>
+                            <p className="text-xs text-zinc-500">PDF only. Maximum file size is 10MB.</p>
+                        </div>
 
-                <section
-                    aria-hidden={!showPreview}
-                    className={`w-full overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-none motion-reduce:transform-none ${
-                        showPreview
-                            ? "max-h-360 opacity-100 translate-y-0 lg:w-[56%] lg:translate-x-0"
-                            : "pointer-events-none max-h-0 opacity-0 translate-y-3 lg:w-0 lg:translate-x-10"
-                    }`}
-                >
-                    <div className="rounded-xl border border-border bg-card shadow-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-                            <h2 className="text-sm font-semibold">Generated Resume Preview</h2>
-                            <div className="flex items-center gap-2">
-                                <Button asChild variant="outline" size="sm">
-                                    <a href={resultUrl || "#"} target="_blank" rel="noreferrer">
-                                        Open in new tab
-                                    </a>
+                        <div className="space-y-2">
+                            <FieldLabel>Job description</FieldLabel>
+                            <textarea
+                                className="min-h-48 w-full rounded-lg border border-[#d9d2c2] bg-white px-3 py-3 text-sm leading-6 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:border-[#9fa76f] focus:ring-3 focus:ring-[#d8dfb6]/50"
+                                placeholder="Paste the job description here..."
+                                value={jobDesc}
+                                onChange={(event) => setJobDesc(event.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <FieldLabel>Extra instructions</FieldLabel>
+                            <textarea
+                                className="min-h-28 w-full rounded-lg border border-[#d9d2c2] bg-white px-3 py-3 text-sm leading-6 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:border-[#9fa76f] focus:ring-3 focus:ring-[#d8dfb6]/50"
+                                placeholder="Example: emphasize customer-facing product launches and quantify team impact."
+                                value={extraInstructions}
+                                onChange={(event) => setExtraInstructions(event.target.value)}
+                            />
+                        </div>
+
+                        {error && (
+                            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Button type="submit" className="h-11 rounded-md bg-[#5d681c] px-6 text-white hover:bg-[#4d5818]" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="size-4" strokeWidth={1.8} />
+                                        Generate packet
+                                    </>
+                                )}
+                            </Button>
+                            {hasResult && !showPreview && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-11 rounded-md border-[#cfc7b7] bg-white"
+                                    onClick={() => {
+                                        setViewerFailed(false);
+                                        setIsPreviewOpen(true);
+                                    }}
+                                >
+                                    <PanelRightOpen className="size-4" strokeWidth={1.8} />
+                                    Show preview
                                 </Button>
-                                <Button type="button" variant="ghost" size="sm" onClick={handleClosePreview}>
-                                    Close preview
+                            )}
+                            {hasResult && (
+                                <Button asChild variant="link" className="h-11 px-0 text-[#4d5818]">
+                                    <a href={resultUrl} target="_blank" rel="noreferrer">Open in new tab</a>
+                                </Button>
+                            )}
+                        </div>
+                    </form>
+                </FormPanel>
+
+                {showPreview ? (
+                    <FormPanel className="overflow-hidden">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5dfd0] bg-[#faf8f1] px-4 py-3">
+                            <div className="flex items-center gap-2">
+                                <FileText className="size-4 text-[#5d681c]" strokeWidth={1.8} />
+                                <h2 className="text-sm font-semibold text-zinc-950">Generated PDF preview</h2>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button asChild variant="outline" size="sm" className="rounded-md border-[#cfc7b7] bg-white">
+                                    <a href={resultUrl || "#"} target="_blank" rel="noreferrer">Open</a>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="rounded-md"
+                                    onClick={() => setIsPreviewOpen(false)}
+                                >
+                                    Close
                                 </Button>
                             </div>
                         </div>
 
                         <div className="p-3">
-                            {showPreview && !viewerFailed && (
+                            {!viewerFailed && (
                                 <iframe
                                     title="generated-resume-preview"
                                     src={resultUrl}
-                                    className="h-[78vh] min-h-136 w-full rounded-md border border-border bg-background"
+                                    className="h-[78vh] min-h-136 w-full rounded-lg border border-[#ded7c8] bg-white"
                                     onError={() => setViewerFailed(true)}
                                     onLoad={() => setViewerFailed(false)}
                                 />
                             )}
-                            {showPreview && viewerFailed && (
-                                <div className="rounded-md border border-border bg-background p-4 text-sm text-muted-foreground">
-                                    Inline PDF preview is unavailable in this browser or for this file URL.
-                                    {" "}
-                                    <a
-                                        href={resultUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="underline text-foreground"
-                                    >
+                            {viewerFailed && (
+                                <div className="rounded-lg border border-[#ded7c8] bg-white p-4 text-sm text-zinc-600">
+                                    Inline PDF preview is unavailable in this browser or for this file URL.{" "}
+                                    <a href={resultUrl} target="_blank" rel="noreferrer" className="font-medium text-[#4d5818] underline">
                                         Open it in a new tab.
                                     </a>
                                 </div>
                             )}
                         </div>
-                    </div>
-                </section>
+                    </FormPanel>
+                ) : (
+                    <aside className="space-y-4">
+                        <FormPanel className="p-5">
+                            <h2 className="text-base font-semibold text-zinc-950">Generation checklist</h2>
+                            <div className="mt-4 space-y-3">
+                                {[
+                                    { label: "Resume attached", done: Boolean(file) },
+                                    { label: "Job post added", done: Boolean(jobDesc.trim()) },
+                                    { label: "Template selected", done: Boolean(template) },
+                                    { label: "Model selected", done: Boolean(model) },
+                                ].map((item) => (
+                                    <div key={item.label} className="flex items-center justify-between rounded-md border border-[#e5dfd0] bg-white px-3 py-2 text-sm">
+                                        <span className="text-zinc-700">{item.label}</span>
+                                        <span className={item.done ? "font-medium text-[#5d681c]" : "text-zinc-400"}>
+                                            {item.done ? "Ready" : "Needed"}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </FormPanel>
+
+                        <FormPanel className="border-[#cbd3ad] bg-[#f4f6e8] p-5">
+                            <h2 className="text-base font-semibold text-zinc-950">Output</h2>
+                            <p className="mt-2 text-sm leading-6 text-zinc-700">
+                                Cover Pilot returns a PDF preview when generation succeeds. Saved user documents also appear in storage while available.
+                            </p>
+                        </FormPanel>
+                    </aside>
+                )}
             </div>
         </div>
     );

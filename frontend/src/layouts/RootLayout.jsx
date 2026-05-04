@@ -36,11 +36,11 @@ export default function RootLayout() {
     };
 
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_42%,#f7f5ec_100%)]">
             <Navbar />
 
             {/* Outlet is to render the children element */}
-            <main className="min-h-screen pt-40 ">
+            <main className="min-h-screen pt-24 sm:pt-28">
                 <Outlet />
             </main>
 

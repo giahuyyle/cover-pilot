@@ -2,33 +2,33 @@ import { Link } from "react-router";
 
 export default function Footer() {
     return (
-        <footer className="py-10 px-10 w-full bg-gray-200">
-            <div className="flex flex-row">
-                <img src="/logo-transparent.svg" alt="Cover Pilot Footer Logo" className="h-50" />
-
-                <div className="ml-auto mr-20 flex flex-row gap-5">
-                    
-                    <div className="mt-5 flex flex-col">
-                        <p className="text-sm font-extralight text-gray-500">
-                            Contact
-                        </p>
-                        <a href="mailto:cover.pilot@gmail.com" className="mt-2 hover:underline cursor-pointer">
-                            cover.pilot@gmail.com
-                        </a>
-                        <a href="https://www.instagram.com/coverpilot" className="hover:underline cursor-pointer">
-                            Instagram
-                        </a>
-
-                        <Link className="hover:underline cursor-pointer text-gray-500 mt-10" to="/terms">
-                            Terms & Conditions
-                        </Link>
-                        <Link className="hover:underline cursor-pointer text-gray-500" to="/privacy">
-                            Privacy
-                        </Link>
+        <footer className="border-t border-[#e4dece] bg-white/78">
+            <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+                <Link to="/dashboard" className="flex items-center gap-3">
+                    <img src="/logo.svg" alt="Cover Pilot" className="size-10 rounded-md" />
+                    <div>
+                        <p className="font-semibold tracking-tight text-zinc-950">Cover Pilot</p>
+                        <p className="text-xs font-medium text-[#5d681c]">Application workspace</p>
                     </div>
+                </Link>
+
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-600">
+                    <a href="mailto:cover.pilot@gmail.com" className="transition hover:text-zinc-950">
+                        Contact
+                    </a>
+                    <a href="https://www.instagram.com/coverpilot" className="transition hover:text-zinc-950">
+                        Instagram
+                    </a>
+                    <Link to="/terms" className="transition hover:text-zinc-950">
+                        Terms
+                    </Link>
+                    <Link to="/privacy" className="transition hover:text-zinc-950">
+                        Privacy
+                    </Link>
                 </div>
+
+                <p className="text-sm text-zinc-500">2026 Cover Pilot. All rights reserved.</p>
             </div>
-            
         </footer>
     );
-};
+}

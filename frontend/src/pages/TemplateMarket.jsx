@@ -1,171 +1,196 @@
+import { ArrowRight, BriefcaseBusiness, GraduationCap, Palette, Search, Sparkles } from "lucide-react";
 import { useState } from "react";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const FILTERS = ["All", "Templates", "Examples"];
 
-// Mock data — replace with real data from your backend later
 const MOCK_TEMPLATES = [
     {
         id: 1,
         title: "Professional Cover Letter",
-        description:
-            "A clean, professional cover letter template suitable for corporate and business applications. Includes structured sections for...",
+        description: "A clean letter structure for corporate, business, and operations applications.",
         author: "Amanda Chen",
-        thumbnail: "https://placehold.co/400x520/f8fafc/94a3b8?text=Cover+Letter",
         category: "Templates",
+        icon: BriefcaseBusiness,
+        tone: "bg-[#f8f4e8]",
     },
     {
         id: 2,
         title: "Modern Minimalist Letter",
-        description:
-            "Minimalist cover letter design with a modern layout. Perfect for tech, design and startup roles. Features clean typography and...",
+        description: "A restrained layout for tech, product, design, and startup roles.",
         author: "Jordan Lee",
-        thumbnail: "https://placehold.co/400x520/f8fafc/94a3b8?text=Minimalist",
         category: "Templates",
+        icon: Sparkles,
+        tone: "bg-[#eef3f5]",
     },
     {
         id: 3,
         title: "Academic Cover Letter",
-        description:
-            "Tailored for academic and research positions. Includes sections for publications, teaching experience and research interests...",
+        description: "A research-focused format for publications, teaching, and academic fit.",
         author: "Dr. Sarah Kim",
-        thumbnail: "https://placehold.co/400x520/f8fafc/94a3b8?text=Academic",
         category: "Templates",
+        icon: GraduationCap,
+        tone: "bg-[#f4f6e8]",
     },
     {
         id: 4,
         title: "Creative Portfolio Letter",
-        description:
-            "A bold, creative cover letter template designed for artists, designers, and other creative professionals who want to stand out...",
+        description: "A confident example for designers, artists, and portfolio-heavy candidates.",
         author: "Marcus Rivera",
-        thumbnail: "https://placehold.co/400x520/f8fafc/94a3b8?text=Creative",
         category: "Examples",
+        icon: Palette,
+        tone: "bg-[#f4f1ea]",
     },
     {
         id: 5,
         title: "Internship Application",
-        description:
-            "Entry-level cover letter example for internship and graduate applications. Highlights education, relevant coursework and...",
+        description: "An entry-level example that balances coursework, projects, and motivation.",
         author: "Emily Zhang",
-        thumbnail: "https://placehold.co/400x520/f8fafc/94a3b8?text=Internship",
         category: "Examples",
+        icon: GraduationCap,
+        tone: "bg-[#f8f4e8]",
     },
     {
         id: 6,
         title: "Career Change Letter",
-        description:
-            "Cover letter example for professionals transitioning between industries. Focuses on transferable skills and motivation for...",
+        description: "A transition-focused example that makes transferable experience clear.",
         author: "David Park",
-        thumbnail: "https://placehold.co/400x520/f8fafc/94a3b8?text=Career+Change",
         category: "Examples",
+        icon: BriefcaseBusiness,
+        tone: "bg-[#eef3f5]",
     },
 ];
+
+function TemplatePreview({ tone }) {
+    return (
+        <div className={`aspect-[4/5] rounded-lg border border-[#d9d2c3] ${tone} p-5 shadow-sm`}>
+            <div className="mb-6 flex items-center justify-between">
+                <div className="h-2 w-24 rounded-full bg-zinc-900/80" />
+                <div className="h-2 w-10 rounded-full bg-[#66701f]/80" />
+            </div>
+            <div className="space-y-2">
+                <div className="h-2 w-full rounded-full bg-zinc-300/80" />
+                <div className="h-2 w-11/12 rounded-full bg-zinc-200" />
+                <div className="h-2 w-4/5 rounded-full bg-zinc-200" />
+            </div>
+            <div className="mt-7 grid grid-cols-[72px_1fr] gap-4">
+                <div className="space-y-2">
+                    <div className="h-2 rounded-full bg-[#66701f]/70" />
+                    <div className="h-2 rounded-full bg-zinc-200" />
+                    <div className="h-2 w-4/5 rounded-full bg-zinc-200" />
+                </div>
+                <div className="space-y-2">
+                    <div className="h-2 rounded-full bg-zinc-300" />
+                    <div className="h-2 w-5/6 rounded-full bg-zinc-200" />
+                    <div className="h-2 w-3/4 rounded-full bg-zinc-200" />
+                </div>
+            </div>
+            <div className="mt-8 space-y-2 border-t border-[#e6dfd1] pt-5">
+                <div className="h-2 w-2/3 rounded-full bg-zinc-300" />
+                <div className="h-2 w-full rounded-full bg-zinc-200" />
+                <div className="h-2 w-4/5 rounded-full bg-zinc-200" />
+            </div>
+        </div>
+    );
+}
 
 export default function TemplateMarket() {
     const [activeFilter, setActiveFilter] = useState("All");
     const [searchQuery, setSearchQuery] = useState("");
 
-    const filtered = MOCK_TEMPLATES.filter((t) => {
-        const matchesFilter =
-            activeFilter === "All" || t.category === activeFilter;
+    const filtered = MOCK_TEMPLATES.filter((template) => {
+        const query = searchQuery.toLowerCase();
+        const matchesFilter = activeFilter === "All" || template.category === activeFilter;
         const matchesSearch =
-            !searchQuery ||
-            t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            t.description.toLowerCase().includes(searchQuery.toLowerCase());
+            !query ||
+            template.title.toLowerCase().includes(query) ||
+            template.description.toLowerCase().includes(query);
+
         return matchesFilter && matchesSearch;
     });
 
     return (
-        <div className="max-w-6xl mx-auto px-6 pb-16">
-            {/* Filter tabs */}
-            <div className="flex justify-end items-center gap-1 text-sm mb-8">
-                <span className="text-[rgb(108,144,46)] mr-1">Filters:</span>
-                {FILTERS.map((filter, i) => (
-                    <span key={filter} className="flex items-center gap-1">
-                        <button
-                            onClick={() => setActiveFilter(filter)}
-                            className={`cursor-pointer transition ${
-                                activeFilter === filter
-                                    ? "text-foreground font-semibold underline underline-offset-4"
-                                    : "text-muted-foreground hover:text-foreground"
-                            }`}
-                        >
-                            {filter}
-                        </button>
-                        {i < FILTERS.length - 1 && (
-                            <span className="text-muted-foreground mx-1">/</span>
-                        )}
-                    </span>
-                ))}
-            </div>
+        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+            <header className="mb-8 grid gap-6 border-b border-[#e3dece] pb-6 lg:grid-cols-[1fr_420px] lg:items-end">
+                <div>
+                    <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Template market</h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
+                        Choose a professional structure before generation or switch formats after your packet is drafted.
+                    </p>
+                </div>
 
-            {/* Hero section */}
-            <div className="flex flex-col items-center text-center mb-12">
-                <p className="text-sm font-mono mb-2 text-[rgb(108,144,46)]">
-                    {"{"} cover pilot template gallery {"}"}
-                </p>
-                <h1 className="text-4xl font-bold text-foreground mb-3">
-                    Cover Letter Templates
-                </h1>
-                <p className="text-muted-foreground font-extralight max-w-xl mb-8">
-                    Cover letter templates for job applications, internships, career
-                    changes, and more.
-                </p>
-
-                {/* Search bar */}
-                <div className="flex items-center gap-3 w-full max-w-lg">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" strokeWidth={1.8} />
                         <Input
                             placeholder="Search templates..."
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-11 rounded-lg"
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            className="h-11 rounded-lg border-[#d9d2c2] bg-white pl-9"
                         />
                     </div>
-                    <Button className="h-11 px-6 rounded-full">Search</Button>
+                    <div className="flex flex-wrap gap-2">
+                        {FILTERS.map((filter) => (
+                            <button
+                                key={filter}
+                                type="button"
+                                onClick={() => setActiveFilter(filter)}
+                                className={`h-9 rounded-md border px-3 text-sm font-medium transition ${
+                                    activeFilter === filter
+                                        ? "border-[#b8be92] bg-[#eef2d8] text-[#3f4a14]"
+                                        : "border-[#ded7c8] bg-white text-zinc-600 hover:border-[#b8be92] hover:text-zinc-950"
+                                }`}
+                            >
+                                {filter}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Section title */}
-            <h2 className="text-2xl font-bold text-foreground mb-6">Recent</h2>
-
-            {/* Template grid */}
             {filtered.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filtered.map((template) => (
-                        <div
-                            key={template.id}
-                            className="group flex flex-col cursor-pointer"
-                        >
-                            {/* Thumbnail */}
-                            <div className="rounded-xl border border-border overflow-hidden bg-muted/30 aspect-3/4 mb-4">
-                                <img
-                                    src={template.thumbnail}
-                                    alt={template.title}
-                                    className="w-full h-full object-cover transition group-hover:scale-[1.02]"
-                                />
-                            </div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {filtered.map((template) => {
+                        const Icon = template.icon;
 
-                            {/* Info */}
-                            <h3 className="text-base font-semibold text-foreground leading-snug mb-1 group-hover:underline">
-                                {template.title}
-                            </h3>
-                            <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                                {template.description}
-                            </p>
-                            <p className="text-sm text-muted-foreground/80">
-                                {template.author}
-                            </p>
-                        </div>
-                    ))}
+                        return (
+                            <article
+                                key={template.id}
+                                className="group rounded-xl border border-[#ded7c8] bg-[#fffdf8] p-4 shadow-[0_18px_55px_rgba(32,31,22,0.06)] transition hover:-translate-y-0.5 hover:border-[#c6cda5]"
+                            >
+                                <TemplatePreview tone={template.tone} />
+                                <div className="mt-5 flex items-start gap-3">
+                                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[#eef2d8] text-[#5d681c]">
+                                        <Icon className="size-5" strokeWidth={1.8} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg font-semibold tracking-tight text-zinc-950">{template.title}</h2>
+                                        <p className="mt-2 text-sm leading-6 text-zinc-600">{template.description}</p>
+                                        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-zinc-500">{template.author}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-5 flex items-center justify-between border-t border-[#e6dfd1] pt-4">
+                                    <span className="rounded-md bg-[#f4f6e8] px-2 py-1 text-xs font-semibold text-[#53621e]">
+                                        {template.category}
+                                    </span>
+                                    <Button asChild variant="outline" size="sm" className="rounded-md border-[#cfc7b7] bg-white">
+                                        <Link to="/generator">
+                                            Use
+                                            <ArrowRight className="size-4" strokeWidth={1.8} />
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </article>
+                        );
+                    })}
                 </div>
             ) : (
-                <p className="text-center text-muted-foreground py-16">
-                    No templates found.
-                </p>
+                <section className="rounded-xl border border-[#ded7c8] bg-[#fffdf8] px-6 py-16 text-center">
+                    <h2 className="text-xl font-semibold text-zinc-950">No templates found</h2>
+                    <p className="mt-2 text-sm text-zinc-600">Try a broader search or switch back to all templates.</p>
+                </section>
             )}
         </div>
     );

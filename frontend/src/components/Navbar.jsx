@@ -1,104 +1,147 @@
-import { Home, LayoutTemplate, PenTool, HardDrive, UserRound, LogIn, LogOut, Sparkles } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router";
-import { auth } from "@/lib/firebase";
+import {
+    FileText,
+    HardDrive,
+    LayoutDashboard,
+    LayoutTemplate,
+    LogIn,
+    LogOut,
+    Sparkles,
+    UserRound,
+} from "lucide-react";
 import { signOut } from "firebase/auth";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
 
-const coreItems = [
-    { label: "Home", icon: Home, to: "/dashboard" },
+const guestItems = [
+    { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
     { label: "Templates", icon: LayoutTemplate, to: "/templates" },
     { label: "Generator", icon: Sparkles, to: "/generator" },
-    { label: "Editor", icon: PenTool, to: "/editor" },
 ];
 
-const authenticatedMainItems = [
+const userItems = [
+    ...guestItems,
     { label: "Storage", icon: HardDrive, to: "/storage" },
 ];
 
-const authenticatedRightItems = [
-    { label: "Profile", icon: UserRound, to: "/profile" },
-];
+function getDisplayName(user) {
+    return (user?.displayName || user?.email?.split("@")[0] || "User").trim();
+}
+
+function getInitials(name) {
+    return name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase();
+}
 
 export default function Navbar() {
     const [user] = useAuthState(auth);
     const { pathname } = useLocation();
     const navigate = useNavigate();
-
-    const mainItems = user ? [...coreItems, ...authenticatedMainItems] : coreItems;
-    const rightItems = user ? authenticatedRightItems : [];
+    const navItems = user ? userItems : guestItems;
+    const displayName = getDisplayName(user);
+    const initials = getInitials(displayName);
 
     const handleLogout = async () => {
         await signOut(auth);
         navigate("/dashboard");
     };
 
-    const renderItem = (item) => {
-        const Icon = item.icon;
-        const isActive = pathname.startsWith(item.to);
-
-        return (
-            <Link key={item.label} to={item.to} className="flex flex-col items-center gap-1.5">
-                <div
-                    className={`flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition ${
-                        isActive ? "bg-zinc-200/60" : "bg-white/80 hover:bg-zinc-200/50"
-                    }`}
-                >
-                    <Icon className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
-                </div>
-                <span className="text-xs text-zinc-700">{item.label}</span>
-            </Link>
-        );
-    };
-
     return (
-        <div className="fixed top-0 left-0 right-0 z-50 flex items-start justify-between px-4 pt-4">
-            <Link to="/dashboard">
-                <img src="/logo.svg" alt="logo" className="h-20 w-20 rounded-md" />
-            </Link>
-
-            <header>
-                <nav
-                    className="flex items-center gap-3 px-4 py-3"
-                    style={{
-                        background: "rgba(186, 196, 200, 0.15)",
-                        borderRadius: "16px",
-                        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-                        backdropFilter: "blur(11.9px)",
-                        WebkitBackdropFilter: "blur(11.9px)",
-                        border: "1px solid rgba(255, 255, 255, 1)",
-                    }}
+        <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl items-start gap-4">
+                <Link
+                    to="/dashboard"
+                    className="pointer-events-auto flex shrink-0 items-center gap-3 rounded-xl border border-white/90 bg-white/62 px-3 py-2 shadow-[0_4px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl transition hover:bg-white/78"
                 >
-                    {mainItems.map(renderItem)}
+                    <img src="/logo.svg" alt="Cover Pilot" className="size-10 rounded-md" />
+                    <div className="hidden leading-tight sm:block">
+                        <span className="block text-base font-semibold tracking-tight text-zinc-950">Cover Pilot</span>
+                        <span className="block text-xs font-medium text-[#5d681c]">Application workspace</span>
+                    </div>
+                </Link>
 
-                    {/* Divider */}
-                    <div className="h-12 w-px bg-zinc-300" />
+                <nav className="pointer-events-auto flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-xl border border-white/90 bg-white/56 p-1.5 shadow-[0_4px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl">
+                    {navItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = pathname === item.to || pathname.startsWith(`${item.to}/`);
 
-                    {rightItems.map(renderItem)}
-
-                    {user ? (
-                        <button onClick={handleLogout} className="flex flex-col items-center gap-1.5 cursor-pointer">
-                            <div className="flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition bg-white/80 hover:bg-red-100">
-                                <LogOut className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
-                            </div>
-                            <span className="text-xs text-zinc-700">Logout</span>
-                        </button>
-                    ) : (
-                        <Link to="/login" className="flex flex-col items-center gap-1.5 cursor-pointer">
-                            <div
-                                className={`flex items-center justify-center w-12 h-12 rounded-lg border border-zinc-200 shadow-sm transition ${
-                                    pathname.startsWith("/login")
-                                        ? "bg-zinc-200/60"
-                                        : "bg-white/80 hover:bg-zinc-200/50"
+                        return (
+                            <Link
+                                key={item.label}
+                                to={item.to}
+                                className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition ${
+                                    isActive
+                                        ? "bg-[#eef2d8] text-[#3f4a14] shadow-sm"
+                                        : "text-zinc-600 hover:bg-[#f7f3e8] hover:text-zinc-950"
                                 }`}
                             >
-                                <LogIn className="h-5 w-5 text-zinc-700" strokeWidth={1.5} />
-                            </div>
-                            <span className="text-xs text-zinc-700">Login</span>
+                                <Icon className="size-4" strokeWidth={1.8} />
+                                <span>{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                <div className="pointer-events-auto flex shrink-0 items-center gap-2">
+                    {user ? (
+                        <>
+                            <Link
+                                to="/profile"
+                                className={`hidden h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium shadow-sm transition md:inline-flex ${
+                                    pathname.startsWith("/profile")
+                                        ? "border-[#b8be92] bg-[#eef2d8] text-[#3f4a14]"
+                                        : "border-white/90 bg-white/70 text-zinc-700 backdrop-blur-xl hover:border-[#b8be92] hover:text-zinc-950"
+                                }`}
+                            >
+                                <span className="flex size-6 items-center justify-center rounded-full bg-[#5d681c] text-[10px] font-semibold text-white">
+                                    {initials}
+                                </span>
+                                <span className="max-w-24 truncate">{displayName}</span>
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                className="inline-flex size-10 items-center justify-center rounded-md border border-white/90 bg-white/70 text-zinc-600 shadow-[0_4px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl transition hover:border-[#d5a0a0] hover:bg-[#fff4f2] hover:text-[#9a3412]"
+                                aria-label="Log out"
+                            >
+                                <LogOut className="size-4" strokeWidth={1.8} />
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <Link
+                                to="/login"
+                                className="hidden h-10 items-center gap-2 rounded-md border border-white/90 bg-white/70 px-3 text-sm font-medium text-zinc-700 shadow-[0_4px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl transition hover:border-[#b8be92] hover:text-zinc-950 sm:inline-flex"
+                            >
+                                <LogIn className="size-4" strokeWidth={1.8} />
+                                Login
+                            </Link>
+                            <Link
+                                to="/signup"
+                                className="inline-flex h-10 items-center gap-2 rounded-md bg-[#5d681c] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
+                            >
+                                <FileText className="size-4" strokeWidth={1.8} />
+                                Sign up
+                            </Link>
+                        </>
+                    )}
+
+                    {user && (
+                        <Link
+                            to="/profile"
+                            className="inline-flex size-10 items-center justify-center rounded-md border border-white/90 bg-white/70 text-zinc-600 shadow-[0_4px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl transition hover:border-[#b8be92] hover:text-zinc-950 md:hidden"
+                            aria-label="Open profile"
+                        >
+                            <UserRound className="size-4" strokeWidth={1.8} />
                         </Link>
                     )}
-                </nav>
-            </header>
-        </div>
-
+                </div>
+            </div>
+        </header>
     );
 }

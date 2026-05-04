@@ -1,13 +1,31 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Mail, Pencil, Save, ShieldCheck, UserRound } from "lucide-react";
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { apiFetch } from "@/lib/api";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateProfile } from "firebase/auth";
-import { Search, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+
+function getInitials(name) {
+    return name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase();
+}
+
+function Panel({ children, className = "" }) {
+    return (
+        <section className={`rounded-xl border border-[#ded7c8] bg-[#fffdf8] shadow-[0_18px_55px_rgba(32,31,22,0.06)] ${className}`}>
+            {children}
+        </section>
+    );
+}
 
 export default function Profile() {
     const [user, loading] = useAuthState(auth);
@@ -18,24 +36,26 @@ export default function Profile() {
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSaveError, setProfileSaveError] = useState("");
     const [profileSaveSuccess, setProfileSaveSuccess] = useState("");
-    const profileDisplayName =
-        (user?.displayName || backendProfile?.display_name || "User").trim() || "User";
-    const firstName = profileDisplayName.split(" ")[0] || "U";
-    const email = user?.email || "";
-    const photoURL = user?.photoURL;
-
-    const today = new Date();
-    const formattedDate = today.toLocaleDateString("en-US", {
-        weekday: "short",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-    });
-
     const [formData, setFormData] = useState({
         fullName: "",
         displayName: "",
     });
+    const {
+        register,
+        handleSubmit,
+        watch,
+        reset,
+        formState: { errors: pwErrors },
+    } = useForm();
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwError, setPwError] = useState(null);
+    const [pwSuccess, setPwSuccess] = useState(null);
+
+    const profileDisplayName = (user?.displayName || backendProfile?.display_name || "User").trim() || "User";
+    const firstName = profileDisplayName.split(" ")[0] || "U";
+    const email = user?.email || "";
+    const photoURL = user?.photoURL;
+    const initials = getInitials(profileDisplayName) || firstName[0];
 
     const handleChange = (field, value) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -133,18 +153,6 @@ export default function Profile() {
         }
     };
 
-    // Change password form
-    const {
-        register,
-        handleSubmit,
-        watch,
-        reset,
-        formState: { errors: pwErrors },
-    } = useForm();
-    const [pwLoading, setPwLoading] = useState(false);
-    const [pwError, setPwError] = useState(null);
-    const [pwSuccess, setPwSuccess] = useState(null);
-
     const onChangePassword = async (data) => {
         setPwError(null);
         setPwSuccess(null);
@@ -174,233 +182,219 @@ export default function Profile() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Loading...</p>
+            <div className="mx-auto max-w-7xl px-4 pb-24 text-sm text-zinc-600 sm:px-6 lg:px-8">
+                Loading profile...
             </div>
         );
     }
 
     return (
-        <div className="max-w-5xl mx-auto px-6 pb-12">
-            {/* Top bar: Welcome + Search + Notification + Avatar */}
-            <div className="flex items-center justify-between mb-6">
+        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+            <header className="mb-8 grid gap-6 border-b border-[#e3dece] pb-6 lg:grid-cols-[1fr_360px] lg:items-end">
                 <div>
-                    <h1 className="text-2xl font-semibold text-foreground">
-                        Welcome, {firstName}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">{formattedDate}</p>
+                    <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Profile settings</h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
+                        Keep your account details accurate so generated drafts can use the right name and saved profile context.
+                    </p>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search"
-                            className="pl-9 w-48 h-9 rounded-full bg-muted/50"
-                        />
+                <Panel className="p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="size-12 overflow-hidden rounded-full border border-[#d9d2c2] bg-[#eef2d8]">
+                            {photoURL ? (
+                                <img src={photoURL} alt="avatar" className="h-full w-full object-cover" />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-[#5d681c]">
+                                    {initials}
+                                </div>
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="truncate font-semibold text-zinc-950">{profileDisplayName}</p>
+                            <p className="truncate text-sm text-zinc-600">{email}</p>
+                        </div>
                     </div>
-                    <button className="relative p-2 rounded-full hover:bg-muted transition">
-                        <Bell className="h-5 w-5 text-muted-foreground" />
-                    </button>
-                    <div className="h-9 w-9 rounded-full overflow-hidden border border-border">
-                        {photoURL ? (
-                            <img
-                                src={photoURL}
-                                alt="avatar"
-                                className="h-full w-full object-cover"
-                            />
-                        ) : (
-                            <div className="h-full w-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                                {firstName[0]}
+                </Panel>
+            </header>
+
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="space-y-6">
+                    <Panel className="p-5 lg:p-6">
+                        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold tracking-tight text-zinc-950">Account identity</h2>
+                                <p className="mt-1 text-sm text-zinc-600">Update your display and profile names.</p>
                             </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+                            <Button
+                                type="button"
+                                onClick={handleProfileAction}
+                                disabled={backendLoading || profileSaving}
+                                className="rounded-md bg-[#5d681c] text-white hover:bg-[#4d5818]"
+                            >
+                                {isEditing ? (
+                                    <>
+                                        <Save className="size-4" strokeWidth={1.8} />
+                                        {profileSaving ? "Saving..." : "Save changes"}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Pencil className="size-4" strokeWidth={1.8} />
+                                        Edit profile
+                                    </>
+                                )}
+                            </Button>
+                        </div>
 
-            {/* Gradient banner */}
-            <div className="h-24 w-full rounded-xl mb-8 bg-linear-to-r from-blue-100 via-blue-50 to-amber-50" />
-
-            {/* Profile header */}
-            <div className="flex items-center justify-between mb-10">
-                <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-border">
-                        {photoURL ? (
-                            <img
-                                src={photoURL}
-                                alt="avatar"
-                                className="h-full w-full object-cover"
-                            />
-                        ) : (
-                            <div className="h-full w-full bg-muted flex items-center justify-center text-lg font-semibold text-muted-foreground">
-                                {firstName[0]}
+                        <div className="grid gap-5 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label>Full Name</Label>
+                                <Input
+                                    placeholder="Your full name"
+                                    value={formData.fullName}
+                                    onChange={(event) => handleChange("fullName", event.target.value)}
+                                    disabled={!isEditing}
+                                    className="h-11 rounded-lg border-[#d9d2c2] bg-white"
+                                />
                             </div>
-                        )}
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-semibold text-foreground">
-                            {profileDisplayName}
-                        </h2>
-                        <p className="text-sm text-muted-foreground">{email}</p>
-                    </div>
+                            <div className="space-y-2">
+                                <Label>Display Name</Label>
+                                <Input
+                                    placeholder="Your display name"
+                                    value={formData.displayName}
+                                    onChange={(event) => handleChange("displayName", event.target.value)}
+                                    disabled={!isEditing}
+                                    className="h-11 rounded-lg border-[#d9d2c2] bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-5 space-y-2">
+                            {backendLoading && <p className="text-sm text-zinc-600">Loading profile...</p>}
+                            {backendError && <p className="whitespace-pre-wrap text-sm text-red-600">{backendError}</p>}
+                            {profileSaveError && <p className="whitespace-pre-wrap text-sm text-red-600">{profileSaveError}</p>}
+                            {profileSaveSuccess && <p className="text-sm text-[#5d681c]">{profileSaveSuccess}</p>}
+                        </div>
+                    </Panel>
+
+                    <Panel className="p-5 lg:p-6">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-semibold tracking-tight text-zinc-950">Change password</h2>
+                            <p className="mt-1 text-sm text-zinc-600">Use a current password and a stronger replacement.</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit(onChangePassword)} className="grid gap-5 md:grid-cols-2">
+                            <div className="space-y-2 md:col-span-2">
+                                <Label htmlFor="currentPassword">Current Password</Label>
+                                <Input
+                                    id="currentPassword"
+                                    type="password"
+                                    placeholder="Enter your current password"
+                                    className="h-11 rounded-lg border-[#d9d2c2] bg-white"
+                                    {...register("currentPassword", {
+                                        required: "Current password is required",
+                                    })}
+                                />
+                                {pwErrors.currentPassword && (
+                                    <p className="text-xs text-red-600">{pwErrors.currentPassword.message}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="newPassword">New Password</Label>
+                                <Input
+                                    id="newPassword"
+                                    type="password"
+                                    placeholder="Enter new password"
+                                    className="h-11 rounded-lg border-[#d9d2c2] bg-white"
+                                    {...register("newPassword", {
+                                        required: "Password is required",
+                                        minLength: {
+                                            value: 8,
+                                            message: "Password must be at least 8 characters",
+                                        },
+                                        pattern: {
+                                            value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/,
+                                            message: "Must include uppercase, lowercase, a number, and a special character",
+                                        },
+                                    })}
+                                />
+                                {pwErrors.newPassword && (
+                                    <p className="text-xs text-red-600">{pwErrors.newPassword.message}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                                <Input
+                                    id="confirmNewPassword"
+                                    type="password"
+                                    placeholder="Re-enter new password"
+                                    className="h-11 rounded-lg border-[#d9d2c2] bg-white"
+                                    {...register("confirmNewPassword", {
+                                        required: "Please confirm your new password",
+                                        validate: (value) => value === watch("newPassword") || "Passwords do not match",
+                                    })}
+                                />
+                                {pwErrors.confirmNewPassword && (
+                                    <p className="text-xs text-red-600">{pwErrors.confirmNewPassword.message}</p>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col gap-2 md:col-span-2">
+                                <Button
+                                    type="submit"
+                                    disabled={pwLoading}
+                                    className="w-fit rounded-md bg-[#5d681c] px-6 text-white hover:bg-[#4d5818]"
+                                >
+                                    {pwLoading ? "Updating..." : "Change password"}
+                                </Button>
+                                {pwError && <p className="text-sm text-red-600">{pwError}</p>}
+                                {pwSuccess && <p className="text-sm text-[#5d681c]">{pwSuccess}</p>}
+                            </div>
+                        </form>
+                    </Panel>
                 </div>
-                <Button
-                    onClick={handleProfileAction}
-                    disabled={backendLoading || profileSaving}
-                    className="rounded-lg px-6"
-                >
-                    {isEditing ? (profileSaving ? "Saving..." : "Save") : "Edit"}
-                </Button>
-            </div>
 
-            {/* Form fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-10">
-                {/* Full Name */}
-                <div className="space-y-2">
-                    <Label>Full Name</Label>
-                    <Input
-                        placeholder="Your Full Name"
-                        value={formData.fullName}
-                        onChange={(e) => handleChange("fullName", e.target.value)}
-                        disabled={!isEditing}
-                    />
-                </div>
+                <aside className="space-y-6">
+                    <Panel className="p-5">
+                        <div className="flex items-start gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-md bg-[#eef2d8] text-[#5d681c]">
+                                <Mail className="size-5" strokeWidth={1.8} />
+                            </div>
+                            <div>
+                                <h2 className="font-semibold text-zinc-950">Primary email</h2>
+                                <p className="mt-1 break-all text-sm text-zinc-600">{email}</p>
+                            </div>
+                        </div>
+                    </Panel>
 
-                {/* Display Name */}
-                <div className="space-y-2">
-                    <Label>Display Name</Label>
-                    <Input
-                        placeholder="Your Display Name"
-                        value={formData.displayName}
-                        onChange={(e) => handleChange("displayName", e.target.value)}
-                        disabled={!isEditing}
-                    />
-                </div>
-            </div>
+                    <Panel className="p-5">
+                        <div className="flex items-start gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-md bg-[#eef2d8] text-[#5d681c]">
+                                <ShieldCheck className="size-5" strokeWidth={1.8} />
+                            </div>
+                            <div>
+                                <h2 className="font-semibold text-zinc-950">Profile quality</h2>
+                                <p className="mt-1 text-sm leading-6 text-zinc-600">
+                                    A complete profile gives generated drafts more reliable sender details.
+                                </p>
+                            </div>
+                        </div>
+                    </Panel>
 
-            {backendLoading && (
-                <p className="mb-6 text-sm text-muted-foreground">Loading profile...</p>
-            )}
-
-            {backendError && (
-                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap wrap-break-word">{backendError}</p>
-            )}
-
-            {profileSaveError && (
-                <p className="mb-6 text-sm text-red-500 whitespace-pre-wrap wrap-break-word">{profileSaveError}</p>
-            )}
-
-            {profileSaveSuccess && (
-                <p className="mb-6 text-sm text-green-600">{profileSaveSuccess}</p>
-            )}
-
-            {/* My email Address */}
-            <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">
-                    My E-mail Address
-                </h3>
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-500">
-                        <svg
-                            className="h-5 w-5 text-white"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                            />
-                        </svg>
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-foreground">{email}</p>
-                        <p className="text-xs text-muted-foreground">Primary E-mail</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Change Password */}
-            <div className="mt-10">
-                <h3 className="text-lg font-semibold text-foreground mb-4">
-                    Change Password
-                </h3>
-                <form
-                    onSubmit={handleSubmit(onChangePassword)}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 max-w-3xl"
-                >
-                    {/* Current Password - full width */}
-                    <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="currentPassword">Enter Current Password</Label>
-                        <Input
-                            id="currentPassword"
-                            type="password"
-                            placeholder="Enter your current password"
-                            {...register("currentPassword", {
-                                required: "Current password is required",
-                            })}
-                        />
-                        {pwErrors.currentPassword && (
-                            <p className="text-red-500 text-xs">{pwErrors.currentPassword.message}</p>
-                        )}
-                    </div>
-
-                    {/* New Password */}
-                    <div className="space-y-2">
-                        <Label htmlFor="newPassword">Enter New Password</Label>
-                        <Input
-                            id="newPassword"
-                            type="password"
-                            placeholder="Enter new password"
-                            {...register("newPassword", {
-                                required: "Password is required",
-                                minLength: {
-                                    value: 8,
-                                    message: "Password must be at least 8 characters",
-                                },
-                                pattern: {
-                                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/,
-                                    message: "Must include uppercase, lowercase, a number, and a special character",
-                                },
-                            })}
-                        />
-                        {pwErrors.newPassword && (
-                            <p className="text-red-500 text-xs">{pwErrors.newPassword.message}</p>
-                        )}
-                    </div>
-
-                    {/* Re-enter New Password */}
-                    <div className="space-y-2">
-                        <Label htmlFor="confirmNewPassword">Re-enter New Password</Label>
-                        <Input
-                            id="confirmNewPassword"
-                            type="password"
-                            placeholder="Re-enter new password"
-                            {...register("confirmNewPassword", {
-                                required: "Please confirm your new password",
-                                validate: (value) =>
-                                    value === watch("newPassword") || "Passwords do not match",
-                            })}
-                        />
-                        {pwErrors.confirmNewPassword && (
-                            <p className="text-red-500 text-xs">{pwErrors.confirmNewPassword.message}</p>
-                        )}
-                    </div>
-
-                    {/* Submit + feedback */}
-                    <div className="md:col-span-2 flex flex-col gap-2">
-                        <Button
-                            type="submit"
-                            disabled={pwLoading}
-                            className="w-fit rounded-lg px-6"
-                        >
-                            {pwLoading ? "Updating..." : "Change Password"}
-                        </Button>
-                        {pwError && <p className="text-red-500 text-sm">{pwError}</p>}
-                        {pwSuccess && <p className="text-green-600 text-sm">{pwSuccess}</p>}
-                    </div>
-                </form>
+                    <Panel className="border-[#cbd3ad] bg-[#f4f6e8] p-5">
+                        <div className="flex items-start gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-md bg-white text-[#5d681c]">
+                                <UserRound className="size-5" strokeWidth={1.8} />
+                            </div>
+                            <div>
+                                <h2 className="font-semibold text-zinc-950">Generation context</h2>
+                                <p className="mt-1 text-sm leading-6 text-zinc-700">
+                                    Keep your profile current before generating high-stakes application packets.
+                                </p>
+                            </div>
+                        </div>
+                    </Panel>
+                </aside>
             </div>
         </div>
     );

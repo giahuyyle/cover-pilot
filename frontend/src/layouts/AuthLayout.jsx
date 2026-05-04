@@ -1,97 +1,81 @@
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
+import {
+    browserLocalPersistence,
+    browserSessionPersistence,
+    createUserWithEmailAndPassword,
+    fetchSignInMethodsForEmail,
+    getRedirectResult,
+    GoogleAuthProvider,
+    sendPasswordResetEmail,
+    setPersistence,
+    signInWithEmailAndPassword,
+    signInWithPopup,
+    signInWithRedirect,
+    updateProfile,
+} from "firebase/auth";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { ArrowRight, CheckCircle2, FileText, Sparkles } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { apiFetch } from "@/lib/api";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, browserLocalPersistence, browserSessionPersistence, setPersistence, fetchSignInMethodsForEmail, sendPasswordResetEmail } from "firebase/auth";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-const loginDetails = {
-    text: "Welcome back!",
-    subText: "Enter your Credentials to access your account",
-    fields: [
-        {
-            name: "email",
-            label: "Email Address",
-            placeholder: "Enter your email",
-            type: "text",
-            rules: {
-                required: "Email is required",
-                pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: "Invalid email address",
-                },
+const loginFields = [
+    {
+        name: "email",
+        label: "Email Address",
+        placeholder: "Enter your email",
+        type: "text",
+        rules: {
+            required: "Email is required",
+            pattern: {
+                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                message: "Invalid email address",
             },
         },
-        {
-            name: "password",
-            label: "Password",
-            placeholder: "Enter your password",
-            type: "password",
-            rules: {
-                required: "Password is required",
-                minLength: { value: 8, message: "Password must be at least 8 characters" },
-            },
+    },
+    {
+        name: "password",
+        label: "Password",
+        placeholder: "Enter your password",
+        type: "password",
+        rules: {
+            required: "Password is required",
+            minLength: { value: 8, message: "Password must be at least 8 characters" },
         },
-    ],
-    checkbox: "Remember for 30 days",
-    question: <h2 className="text-center mt-5 text-sm">Don't have an account? <a href="/signup" className="text-[rgb(108,144,46)] hover:underline">Sign Up</a></h2>,
-}
+    },
+];
 
-const registerDetails = {
-    text: "Create an account",
-    subText: "Enter your details to create your account",
-    fields: [
-        {
-            name: "fullName",
-            label: "Full Name",
-            placeholder: "Enter your full name",
-            type: "text",
-            rules: {
-                required: "Full name is required",
-                minLength: { value: 2, message: "Name must be at least 2 characters" },
-            },
+const registerFields = [
+    {
+        name: "fullName",
+        label: "Full Name",
+        placeholder: "Enter your full name",
+        type: "text",
+        rules: {
+            required: "Full name is required",
+            minLength: { value: 2, message: "Name must be at least 2 characters" },
         },
-        {
-            name: "email",
-            label: "Email Address",
-            placeholder: "Enter your email",
-            type: "text",
-            rules: {
-                required: "Email is required",
-                pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: "Invalid email address",
-                },
-            },
+    },
+    ...loginFields,
+    {
+        name: "confirmPassword",
+        label: "Confirm Password",
+        placeholder: "Re-enter your password",
+        type: "password",
+        rules: {
+            required: "Please confirm your password",
         },
-        {
-            name: "password",
-            label: "Password",
-            placeholder: "Enter your password",
-            type: "password",
-            rules: {
-                required: "Password is required",
-                minLength: { value: 8, message: "Password must be at least 8 characters" },
-                pattern: {
-                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s])/,
-                    message: "Must include uppercase, lowercase, a number, and a special character",
-                },
-            },
-        },
-        {
-            name: "confirmPassword",
-            label: "Confirm Password",
-            placeholder: "Re-enter your password",
-            type: "password",
-            rules: {
-                required: "Please confirm your password",
-            },
-        },
-    ],
-    checkbox: <h1 className="text-sm">I agree to the <a href="#" className="text-[rgb(108,144,46)] hover:underline">Terms of Service</a> and <a href="#" className="text-[rgb(108,144,46)] hover:underline">Privacy Policy</a></h1>,
-    question: <h2 className="text-center mt-5 text-sm">Already has an account? <a href="/login" className="text-[rgb(108,144,46)] hover:underline">Sign In</a></h2>,
-}
+    },
+];
+
+const authBenefits = [
+    "Save generated packets while they are available",
+    "Use profile details for cleaner sender context",
+    "Choose provider and model for generation",
+];
 
 let redirectResultPromise;
 
@@ -100,9 +84,59 @@ const getSharedRedirectResult = () => {
     return redirectResultPromise;
 };
 
+function GoogleIcon() {
+    return (
+        <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
+            <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.193 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.955 3.045l5.657-5.657C34.046 6.053 29.27 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z" />
+            <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.955 3.045l5.657-5.657C34.046 6.053 29.27 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
+            <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.153 35.091 26.715 36 24 36c-5.172 0-9.619-3.321-11.283-7.946l-6.52 5.025C9.505 39.556 16.227 44 24 44z" />
+            <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.05 12.05 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z" />
+        </svg>
+    );
+}
+
+function MiniWorkspacePreview() {
+    return (
+        <div className="rounded-xl border border-white/16 bg-white/10 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.18)] backdrop-blur">
+            <div className="mb-4 flex items-center justify-between border-b border-white/12 pb-3">
+                <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-[#d6efa3]">Cover Pilot</p>
+                    <p className="mt-1 text-lg font-semibold text-white">Application workspace</p>
+                </div>
+                <div className="flex size-10 items-center justify-center rounded-md bg-[#d6efa3] text-[#3f4a14]">
+                    <Sparkles className="size-5" strokeWidth={1.8} />
+                </div>
+            </div>
+            <div className="grid gap-3">
+                {[
+                    ["Resume health", "78%", "bg-[#d6efa3]"],
+                    ["Drafts ready", "12", "bg-[#f4dfb7]"],
+                    ["Applications", "14", "bg-[#dce6ef]"],
+                ].map(([label, value, tone]) => (
+                    <div key={label} className="rounded-lg border border-white/12 bg-white/10 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                            <span className="text-sm text-zinc-200">{label}</span>
+                            <span className="font-semibold text-white">{value}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-white/14">
+                            <div className={`h-full w-3/4 rounded-full ${tone}`} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export default function AuthLayout({ isLogin = true }) {
-    const details = isLogin ? loginDetails : registerDetails;
-    const { register, handleSubmit, watch, getValues, formState: { errors } } = useForm();
+    const fields = isLogin ? loginFields : registerFields;
+    const {
+        register,
+        handleSubmit,
+        watch,
+        getValues,
+        formState: { errors },
+    } = useForm();
     const [authError, setAuthError] = useState(null);
     const [authMessage, setAuthMessage] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -126,7 +160,6 @@ export default function AuthLayout({ isLogin = true }) {
                 }),
             });
         } catch (error) {
-            // Do not block login/signup when profile sync fails.
             console.error("Failed to sync user profile to backend:", error);
         }
     }, []);
@@ -156,7 +189,6 @@ export default function AuthLayout({ isLogin = true }) {
         };
     }, [navigate, syncUserProfileToBackend]);
 
-    // Redirect to dashboard if already signed in
     useEffect(() => {
         if (!checkingRedirect && user) navigate("/dashboard");
     }, [checkingRedirect, user, navigate]);
@@ -168,8 +200,6 @@ export default function AuthLayout({ isLogin = true }) {
 
         try {
             if (isLogin) {
-                // "Remember for 30 days" = local persistence (survives browser close)
-                // Otherwise = session persistence (cleared when tab closes)
                 const persistence = data.rememberMe ? browserLocalPersistence : browserSessionPersistence;
                 await setPersistence(auth, persistence);
                 const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
@@ -188,14 +218,15 @@ export default function AuthLayout({ isLogin = true }) {
                 case "auth/invalid-credential":
                 case "auth/wrong-password":
                 case "auth/user-not-found": {
-                    // Check if this email was registered via Google
                     try {
                         const methods = await fetchSignInMethodsForEmail(auth, data.email);
                         if (methods.includes("google.com") && !methods.includes("password")) {
-                            setAuthError("This account was signed up via Google. Please use the Sign In with Google button below to access your account.");
+                            setAuthError("This account was signed up via Google. Please use the Sign in with Google button.");
                             break;
                         }
-                    } catch { /* ignore lookup errors */ }
+                    } catch {
+                        // Ignore lookup errors and show the standard auth error.
+                    }
                     setAuthError("Invalid email or password.");
                     break;
                 }
@@ -253,97 +284,157 @@ export default function AuthLayout({ isLogin = true }) {
     };
 
     return (
-        <div className="min-h-screen flex relative">
-            <img src="/logo.svg" alt="logo" className="absolute top-4 left-4 h-30 rounded-md" />
-
-            <div className="flex-1 h-screen py-35 px-50">
-                <div className="flex flex-col justify-left w-full">
-
-                    <h1 className="text-3xl">{details.text}</h1>
-
-                    <h2 className="text-xl font-extralight mt-3">{details.subText}</h2>
-
-                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col mt-10 gap-5">
-                        {details.fields.map((field) => (
-                            <div key={field.name} className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">{field.label}</label>
-                                <input
-                                    type={field.type}
-                                    placeholder={field.placeholder}
-                                    className={`border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[rgb(108,144,46)] ${errors[field.name] ? "border-red-500" : "border-gray-300"}`}
-                                    {...register(field.name, {
-                                        ...field.rules,
-                                        ...(field.name === "confirmPassword" && {
-                                            validate: (value) => value === watch("password") || "Passwords do not match",
-                                        }),
-                                    })}
-                                />
-                                {errors[field.name] && (
-                                    <p className="text-red-500 text-xs">{errors[field.name].message}</p>
-                                )}
-                            </div>
-                        ))}
-
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    id="checkbox"
-                                    className="h-4 w-4 focus:ring-[rgb(108,144,46)] border-gray-300 rounded"
-                                    {...(isLogin
-                                        ? register("rememberMe")
-                                        : register("agreeTerms", { required: "You must agree to the Terms of Service and Privacy Policy" })
-                                    )}
-                                />
-                                <label htmlFor="checkbox" className="text-sm">{details.checkbox}</label>
-                            </div>
-                            {errors.agreeTerms && (
-                                <p className="text-red-500 text-xs">{errors.agreeTerms.message}</p>
-                            )}
-
-                            {isLogin && (
-                                <button
-                                    type="button"
-                                    onClick={handleForgotPassword}
-                                    className="w-fit text-sm text-[rgb(108,144,46)] hover:underline mt-2 cursor-pointer"
-                                >
-                                    Forgot your password?
-                                </button>
-                            )}
+        <div className="min-h-screen bg-[#fbfaf5]">
+            <div className="mx-auto grid min-h-screen max-w-7xl lg:grid-cols-[0.95fr_1.05fr]">
+                <section className="flex min-h-screen flex-col px-4 py-8 sm:px-6 lg:px-8">
+                    <Link to="/" className="flex w-fit items-center gap-3">
+                        <img src="/logo.svg" alt="Cover Pilot" className="size-11 rounded-md" />
+                        <div>
+                            <p className="font-semibold tracking-tight text-zinc-950">Cover Pilot</p>
+                            <p className="text-xs font-medium text-[#5d681c]">Application workspace</p>
                         </div>
+                    </Link>
 
-                        <button type="submit" disabled={loading} className="bg-[rgb(108,144,46)]/80 hover:bg-[rgb(108,144,46)] cursor-pointer text-white py-2 rounded-md transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                            {loading ? "Please wait..." : (isLogin ? "Login" : "Sign Up")}
-                        </button>
-                    </form>
+                    <div className="flex flex-1 items-center py-10">
+                        <div className="w-full max-w-md">
+                            <h1 className="text-4xl font-semibold tracking-tight text-zinc-950">
+                                {isLogin ? "Welcome back." : "Create your workspace."}
+                            </h1>
+                            <p className="mt-3 text-sm leading-6 text-zinc-600">
+                                {isLogin
+                                    ? "Sign in to continue generating, saving, and tracking your application packets."
+                                    : "Start generating tailored resumes and cover letters with saved profile context."}
+                            </p>
 
-                    {authError && (
-                        <p className="text-red-500 text-sm text-center mt-3">{authError}</p>
-                    )}
-                    {authMessage && (
-                        <p className="text-green-600 text-sm text-center mt-3">{authMessage}</p>
-                    )}
+                            <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
+                                {fields.map((field) => (
+                                    <div key={field.name} className="space-y-2">
+                                        <label className="text-sm font-semibold text-zinc-900">{field.label}</label>
+                                        <Input
+                                            type={field.type}
+                                            placeholder={field.placeholder}
+                                            className={`h-11 rounded-lg border bg-white ${
+                                                errors[field.name] ? "border-red-400" : "border-[#d9d2c2]"
+                                            }`}
+                                            {...register(field.name, {
+                                                ...field.rules,
+                                                ...(field.name === "confirmPassword" && {
+                                                    validate: (value) => value === watch("password") || "Passwords do not match",
+                                                }),
+                                            })}
+                                        />
+                                        {errors[field.name] && (
+                                            <p className="text-xs text-red-600">{errors[field.name].message}</p>
+                                        )}
+                                    </div>
+                                ))}
 
-                    <h1 className="text-center mt-5">OR</h1>
-                    <button
-                        onClick={handleGoogleSignIn}
-                        disabled={loading}
-                        className="bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300 transition duration-200 mt-5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
-                    >
-                        <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
-                            <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.193 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.955 3.045l5.657-5.657C34.046 6.053 29.27 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"/>
-                            <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.955 3.045l5.657-5.657C34.046 6.053 29.27 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-                            <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.153 35.091 26.715 36 24 36c-5.172 0-9.619-3.321-11.283-7.946l-6.52 5.025C9.505 39.556 16.227 44 24 44z"/>
-                            <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.05 12.05 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z"/>
-                        </svg>
-                        Sign In with Google
-                    </button>
+                                <div className="space-y-2">
+                                    <div className="flex items-start gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="checkbox"
+                                            className="mt-0.5 size-4 rounded border-[#cfc7b7] text-[#5d681c] focus:ring-[#d8dfb6]"
+                                            {...(isLogin
+                                                ? register("rememberMe")
+                                                : register("agreeTerms", { required: "You must agree to the Terms of Service and Privacy Policy" })
+                                            )}
+                                        />
+                                        <label htmlFor="checkbox" className="text-sm leading-5 text-zinc-600">
+                                            {isLogin ? (
+                                                "Remember for 30 days"
+                                            ) : (
+                                                <>
+                                                    I agree to the{" "}
+                                                    <Link to="/terms" className="font-medium text-[#4d5818] hover:underline">Terms</Link>
+                                                    {" "}and{" "}
+                                                    <Link to="/privacy" className="font-medium text-[#4d5818] hover:underline">Privacy Policy</Link>
+                                                </>
+                                            )}
+                                        </label>
+                                    </div>
+                                    {errors.agreeTerms && (
+                                        <p className="text-xs text-red-600">{errors.agreeTerms.message}</p>
+                                    )}
 
-                    {details.question}
-                </div>
+                                    {isLogin && (
+                                        <button
+                                            type="button"
+                                            onClick={handleForgotPassword}
+                                            className="text-sm font-medium text-[#4d5818] hover:underline"
+                                        >
+                                            Forgot your password?
+                                        </button>
+                                    )}
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="h-11 w-full rounded-md bg-[#5d681c] text-white hover:bg-[#4d5818]"
+                                >
+                                    {loading ? "Please wait..." : (isLogin ? "Login" : "Sign up")}
+                                    <ArrowRight className="size-4" strokeWidth={1.8} />
+                                </Button>
+                            </form>
+
+                            {authError && (
+                                <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{authError}</p>
+                            )}
+                            {authMessage && (
+                                <p className="mt-4 rounded-md border border-[#cbd3ad] bg-[#f4f6e8] px-3 py-2 text-sm text-[#4d5818]">{authMessage}</p>
+                            )}
+
+                            <div className="my-6 flex items-center gap-3">
+                                <div className="h-px flex-1 bg-[#e4dece]" />
+                                <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">or</span>
+                                <div className="h-px flex-1 bg-[#e4dece]" />
+                            </div>
+
+                            <Button
+                                type="button"
+                                onClick={handleGoogleSignIn}
+                                disabled={loading}
+                                variant="outline"
+                                className="h-11 w-full rounded-md border-[#cfc7b7] bg-white"
+                            >
+                                <GoogleIcon />
+                                Sign in with Google
+                            </Button>
+
+                            <p className="mt-6 text-center text-sm text-zinc-600">
+                                {isLogin ? "Do not have an account?" : "Already have an account?"}
+                                {" "}
+                                <Link to={isLogin ? "/signup" : "/login"} className="font-semibold text-[#4d5818] hover:underline">
+                                    {isLogin ? "Sign up" : "Sign in"}
+                                </Link>
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <aside className="hidden min-h-screen bg-[#1f2613] px-8 py-8 text-white lg:flex lg:flex-col lg:justify-between">
+                    <div className="flex items-center gap-3 text-[#d6efa3]">
+                        <FileText className="size-5" strokeWidth={1.8} />
+                        <span className="text-sm font-medium">Tailored resumes and cover letters</span>
+                    </div>
+
+                    <div className="mx-auto w-full max-w-lg">
+                        <MiniWorkspacePreview />
+                        <h2 className="mt-8 text-3xl font-semibold tracking-tight">Keep every application packet in one focused workspace.</h2>
+                        <div className="mt-6 space-y-3">
+                            {authBenefits.map((benefit) => (
+                                <div key={benefit} className="flex items-center gap-2 text-sm text-zinc-200">
+                                    <CheckCircle2 className="size-4 text-[#d6efa3]" strokeWidth={1.8} />
+                                    {benefit}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <p className="text-sm text-zinc-400">2026 Cover Pilot</p>
+                </aside>
             </div>
-
-            <img src="/auth/auth-picture.jpg" alt="picture" className="sticky top-0 ml-auto rounded-l-2xl h-screen object-cover" />
         </div>
     );
 }

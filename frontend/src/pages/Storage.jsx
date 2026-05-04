@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { Archive, Download, FileText, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const PAGE_SIZE = 10;
 
@@ -45,6 +47,19 @@ function formatDateTime(value) {
     });
 }
 
+function DocumentTypeBadge({ type }) {
+    const label = type || "resume";
+    const className = label === "cover_letter"
+        ? "bg-[#f4dfb7] text-[#73521d]"
+        : "bg-[#e5ecd8] text-[#46591d]";
+
+    return (
+        <span className={`inline-flex w-fit rounded-md px-2 py-1 text-xs font-semibold capitalize ${className}`}>
+            {label.replace("_", " ")}
+        </span>
+    );
+}
+
 export default function Storage() {
     const [user, authLoading] = useAuthState(auth);
     const [loading, setLoading] = useState(false);
@@ -52,6 +67,7 @@ export default function Storage() {
     const [documents, setDocuments] = useState([]);
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState(createDefaultPagination());
+    const [query, setQuery] = useState("");
 
     useEffect(() => {
         if (!user) {
@@ -93,20 +109,69 @@ export default function Storage() {
         };
     }, [user, page]);
 
+    const filteredDocuments = documents.filter((doc) => {
+        const safeQuery = query.toLowerCase().trim();
+        if (!safeQuery) return true;
+
+        return [doc.company_name, doc.position_name, doc.name, doc.template, doc.kind]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(safeQuery));
+    });
+
     if (authLoading) {
-        return <div className="mx-auto max-w-5xl px-6 pb-20 text-muted-foreground">Loading...</div>;
+        return (
+            <div className="mx-auto max-w-7xl px-4 pb-24 text-sm text-zinc-600 sm:px-6 lg:px-8">
+                Loading storage...
+            </div>
+        );
     }
 
     return (
-        <div className="mx-auto max-w-5xl px-6 pb-20">
-            <header className="mb-8">
-                <p className="text-sm font-mono mb-1 text-[rgb(108,144,46)]">{`{ storage }`}</p>
-                <h1 className="text-3xl font-bold">Generated Documents</h1>
-                <p className="text-muted-foreground mt-1">View or download documents that have not expired yet.</p>
+        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+            <header className="mb-8 grid gap-6 border-b border-[#e3dece] pb-6 lg:grid-cols-[1fr_380px] lg:items-end">
+                <div>
+                    <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Generated documents</h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
+                        View, download, and check expiration for saved application packets.
+                    </p>
+                </div>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" strokeWidth={1.8} />
+                    <Input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search saved documents..."
+                        className="h-11 rounded-lg border-[#d9d2c2] bg-white pl-9"
+                    />
+                </div>
             </header>
 
-            <section className="rounded-xl border border-border bg-card overflow-hidden">
-                <div className="grid grid-cols-12 gap-4 border-b border-border bg-muted/30 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-5 grid gap-4 sm:grid-cols-3">
+                {[
+                    { label: "Saved documents", value: pagination.total_items, icon: Archive },
+                    { label: "Current page", value: pagination.page, icon: FileText },
+                    { label: "Storage status", value: "Active", icon: ShieldCheck },
+                ].map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                        <section key={item.label} className="rounded-lg border border-[#ded7c8] bg-[#fffdf8] p-4 shadow-sm">
+                            <div className="flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="text-sm text-zinc-600">{item.label}</p>
+                                    <p className="mt-1 text-2xl font-semibold text-zinc-950">{item.value}</p>
+                                </div>
+                                <div className="flex size-10 items-center justify-center rounded-md bg-[#eef2d8] text-[#5d681c]">
+                                    <Icon className="size-5" strokeWidth={1.8} />
+                                </div>
+                            </div>
+                        </section>
+                    );
+                })}
+            </div>
+
+            <section className="overflow-hidden rounded-xl border border-[#ded7c8] bg-[#fffdf8] shadow-[0_18px_55px_rgba(32,31,22,0.06)]">
+                <div className="hidden grid-cols-12 gap-4 border-b border-[#e5dfd0] bg-[#faf8f1] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500 md:grid">
                     <div className="col-span-4">Name</div>
                     <div className="col-span-2">Type</div>
                     <div className="col-span-2">Template</div>
@@ -115,18 +180,29 @@ export default function Storage() {
                 </div>
 
                 {loading && (
-                    <div className="px-4 py-6 text-sm text-muted-foreground">Loading documents...</div>
+                    <div className="flex items-center gap-2 px-5 py-8 text-sm text-zinc-600">
+                        <RefreshCw className="size-4 animate-spin" strokeWidth={1.8} />
+                        Loading documents...
+                    </div>
                 )}
 
                 {!loading && error && (
-                    <div className="px-4 py-6 text-sm text-red-600 whitespace-pre-wrap">{error}</div>
+                    <div className="px-5 py-8 text-sm text-red-600 whitespace-pre-wrap">{error}</div>
                 )}
 
-                {!loading && !error && documents.length === 0 && (
-                    <div className="px-4 py-10 text-sm text-muted-foreground">No generated documents found.</div>
+                {!loading && !error && filteredDocuments.length === 0 && (
+                    <div className="px-5 py-14 text-center">
+                        <div className="mx-auto flex size-12 items-center justify-center rounded-md bg-[#eef2d8] text-[#5d681c]">
+                            <FileText className="size-6" strokeWidth={1.8} />
+                        </div>
+                        <h2 className="mt-4 text-lg font-semibold text-zinc-950">No generated documents found</h2>
+                        <p className="mt-2 text-sm text-zinc-600">
+                            Generate a resume or cover letter and it will appear here while it is still available.
+                        </p>
+                    </div>
                 )}
 
-                {!loading && !error && documents.map((doc) => {
+                {!loading && !error && filteredDocuments.map((doc) => {
                     const isExpired = Boolean(doc.expired);
                     const companyName = (doc.company_name || "").trim();
                     const positionName = (doc.position_name || "").trim();
@@ -134,29 +210,41 @@ export default function Storage() {
                     const displayPosition = positionName;
 
                     return (
-                        <div key={doc.id} className="grid grid-cols-12 gap-4 px-4 py-4 border-b border-border last:border-b-0 items-center">
-                            <div className="col-span-4 min-w-0">
-                                <div className="font-medium truncate">{displayCompany}</div>
-                                {displayPosition && (
-                                    <div className="text-sm text-muted-foreground truncate">{displayPosition}</div>
-                                )}
-                                <div className="text-xs text-muted-foreground">Expires: {formatDateTime(doc.expires_at)}</div>
+                        <div key={doc.id} className="grid gap-4 border-b border-[#eee8dc] px-5 py-4 last:border-b-0 md:grid-cols-12 md:items-center">
+                            <div className="min-w-0 md:col-span-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#f4f6e8] text-[#5d681c]">
+                                        <FileText className="size-4" strokeWidth={1.8} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="truncate font-medium text-zinc-950">{displayCompany}</div>
+                                        {displayPosition && (
+                                            <div className="truncate text-sm text-zinc-600">{displayPosition}</div>
+                                        )}
+                                        <div className="text-xs text-zinc-500">Expires: {formatDateTime(doc.expires_at)}</div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="col-span-2 text-sm capitalize">{doc.kind || "resume"}</div>
-                            <div className="col-span-2 text-sm capitalize">{doc.template || "-"}</div>
-                            <div className="col-span-2 text-sm text-muted-foreground">{formatDateTime(doc.created_at)}</div>
+                            <div className="md:col-span-2">
+                                <DocumentTypeBadge type={doc.kind} />
+                            </div>
+                            <div className="text-sm capitalize text-zinc-700 md:col-span-2">{doc.template || "-"}</div>
+                            <div className="text-sm text-zinc-600 md:col-span-2">{formatDateTime(doc.created_at)}</div>
 
-                            <div className="col-span-2 flex justify-end gap-2">
+                            <div className="flex gap-2 md:col-span-2 md:justify-end">
                                 {isExpired ? (
-                                    <span className="text-xs font-semibold text-red-600">EXPIRED</span>
+                                    <span className="rounded-md bg-[#fff1ed] px-2 py-1 text-xs font-semibold text-red-700">Expired</span>
                                 ) : (
                                     <>
-                                        <Button asChild variant="outline" size="sm">
+                                        <Button asChild variant="outline" size="sm" className="rounded-md border-[#cfc7b7] bg-white">
                                             <a href={doc.view_url} target="_blank" rel="noreferrer">View</a>
                                         </Button>
-                                        <Button asChild size="sm">
-                                            <a href={doc.download_url}>Download</a>
+                                        <Button asChild size="sm" className="rounded-md bg-[#5d681c] text-white hover:bg-[#4d5818]">
+                                            <a href={doc.download_url}>
+                                                <Download className="size-4" strokeWidth={1.8} />
+                                                Download
+                                            </a>
                                         </Button>
                                     </>
                                 )}
@@ -166,20 +254,21 @@ export default function Storage() {
                 })}
             </section>
 
-            <div className="mt-6 flex items-center justify-between">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="rounded-md border-[#cfc7b7] bg-white"
                     disabled={loading || !pagination.has_prev}
                     onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                 >
                     Prev
                 </Button>
 
-                <p className="text-sm text-muted-foreground text-center">
+                <p className="text-center text-sm text-zinc-600">
                     Page {pagination.page} of {pagination.total_pages}
-                    {" \u2022 "}
+                    {" | "}
                     {pagination.total_items} total documents
                 </p>
 
@@ -187,6 +276,7 @@ export default function Storage() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="rounded-md border-[#cfc7b7] bg-white"
                     disabled={loading || !pagination.has_next}
                     onClick={() => setPage((prev) => prev + 1)}
                 >
