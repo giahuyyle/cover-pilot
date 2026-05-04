@@ -101,10 +101,10 @@ function MiniWorkspacePreview() {
             <div className="mb-4 flex items-center justify-between border-b border-white/12 pb-3">
                 <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-[#d6efa3]">Cover Pilot</p>
-                    <p className="mt-1 text-lg font-semibold text-white">Application workspace</p>
+                    <p className="mt-1 text-base font-semibold text-white">Application workspace</p>
                 </div>
-                <div className="flex size-10 items-center justify-center rounded-md bg-[#d6efa3] text-[#3f4a14]">
-                    <Sparkles className="size-5" strokeWidth={1.8} />
+                <div className="flex size-9 items-center justify-center rounded-md bg-[#d6efa3] text-[#3f4a14]">
+                    <Sparkles className="size-4" strokeWidth={1.8} />
                 </div>
             </div>
             <div className="grid gap-3">
@@ -284,50 +284,52 @@ export default function AuthLayout({ isLogin = true }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#fbfaf5]">
-            <div className="mx-auto grid min-h-screen max-w-7xl lg:grid-cols-[0.95fr_1.05fr]">
-                <section className="flex min-h-screen flex-col px-4 py-8 sm:px-6 lg:px-8">
-                    <Link to="/" className="flex w-fit items-center gap-3">
-                        <img src="/logo.svg" alt="Cover Pilot" className="size-11 rounded-md" />
-                        <div>
-                            <p className="font-semibold tracking-tight text-zinc-950">Cover Pilot</p>
-                            <p className="text-xs font-medium text-[#5d681c]">Application workspace</p>
-                        </div>
-                    </Link>
+        <div className="min-h-screen bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_48%,#f4f1e8_100%)] px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center">
+                <div className="grid w-full overflow-hidden rounded-2xl border border-[#ded7c8] bg-[#fffdf8] shadow-[0_28px_90px_rgba(45,42,29,0.12)] lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)]">
+                    <section className="px-5 py-6 sm:px-8 lg:px-10">
+                        <Link to="/" className="flex w-fit items-center gap-3">
+                            <img src="/logo.svg" alt="Cover Pilot" className="size-11 rounded-md" />
+                            <div>
+                                <p className="font-semibold tracking-tight text-zinc-950">Cover Pilot</p>
+                                <p className="text-xs font-medium text-[#5d681c]">Application workspace</p>
+                            </div>
+                        </Link>
 
-                    <div className="flex flex-1 items-center py-10">
-                        <div className="w-full max-w-md">
-                            <h1 className="text-4xl font-semibold tracking-tight text-zinc-950">
+                        <div className="mt-10 max-w-2xl">
+                            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
                                 {isLogin ? "Welcome back." : "Create your workspace."}
                             </h1>
-                            <p className="mt-3 text-sm leading-6 text-zinc-600">
+                            <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600">
                                 {isLogin
                                     ? "Sign in to continue generating, saving, and tracking your application packets."
                                     : "Start generating tailored resumes and cover letters with saved profile context."}
                             </p>
 
-                            <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
-                                {fields.map((field) => (
-                                    <div key={field.name} className="space-y-2">
-                                        <label className="text-sm font-semibold text-zinc-900">{field.label}</label>
-                                        <Input
-                                            type={field.type}
-                                            placeholder={field.placeholder}
-                                            className={`h-11 rounded-lg border bg-white ${
-                                                errors[field.name] ? "border-red-400" : "border-[#d9d2c2]"
-                                            }`}
-                                            {...register(field.name, {
-                                                ...field.rules,
-                                                ...(field.name === "confirmPassword" && {
-                                                    validate: (value) => value === watch("password") || "Passwords do not match",
-                                                }),
-                                            })}
-                                        />
-                                        {errors[field.name] && (
-                                            <p className="text-xs text-red-600">{errors[field.name].message}</p>
-                                        )}
-                                    </div>
-                                ))}
+                            <form onSubmit={handleSubmit(onSubmit)} className="mt-7 space-y-5">
+                                <div className={`grid gap-4 ${isLogin ? "grid-cols-1" : "sm:grid-cols-2"}`}>
+                                    {fields.map((field) => (
+                                        <div key={field.name} className="space-y-2">
+                                            <label className="text-sm font-semibold text-zinc-900">{field.label}</label>
+                                            <Input
+                                                type={field.type}
+                                                placeholder={field.placeholder}
+                                                className={`h-10 rounded-lg border bg-white text-sm ${
+                                                    errors[field.name] ? "border-red-400" : "border-[#d9d2c2]"
+                                                }`}
+                                                {...register(field.name, {
+                                                    ...field.rules,
+                                                    ...(field.name === "confirmPassword" && {
+                                                        validate: (value) => value === watch("password") || "Passwords do not match",
+                                                    }),
+                                                })}
+                                            />
+                                            {errors[field.name] && (
+                                                <p className="text-xs text-red-600">{errors[field.name].message}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
 
                                 <div className="space-y-2">
                                     <div className="flex items-start gap-2">
@@ -368,14 +370,27 @@ export default function AuthLayout({ isLogin = true }) {
                                     )}
                                 </div>
 
-                                <Button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="h-11 w-full rounded-md bg-[#5d681c] text-white hover:bg-[#4d5818]"
-                                >
-                                    {loading ? "Please wait..." : (isLogin ? "Login" : "Sign up")}
-                                    <ArrowRight className="size-4" strokeWidth={1.8} />
-                                </Button>
+                                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                                    <Button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="h-10 rounded-md bg-[#5d681c] text-white hover:bg-[#4d5818]"
+                                    >
+                                        {loading ? "Please wait..." : (isLogin ? "Login" : "Sign up")}
+                                        <ArrowRight className="size-4" strokeWidth={1.8} />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={handleGoogleSignIn}
+                                        disabled={loading}
+                                        variant="outline"
+                                        className="h-10 rounded-md border-[#cfc7b7] bg-white px-4"
+                                    >
+                                        <GoogleIcon />
+                                        <span className="hidden sm:inline">Google</span>
+                                        <span className="sm:hidden">Sign in with Google</span>
+                                    </Button>
+                                </div>
                             </form>
 
                             {authError && (
@@ -385,24 +400,7 @@ export default function AuthLayout({ isLogin = true }) {
                                 <p className="mt-4 rounded-md border border-[#cbd3ad] bg-[#f4f6e8] px-3 py-2 text-sm text-[#4d5818]">{authMessage}</p>
                             )}
 
-                            <div className="my-6 flex items-center gap-3">
-                                <div className="h-px flex-1 bg-[#e4dece]" />
-                                <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">or</span>
-                                <div className="h-px flex-1 bg-[#e4dece]" />
-                            </div>
-
-                            <Button
-                                type="button"
-                                onClick={handleGoogleSignIn}
-                                disabled={loading}
-                                variant="outline"
-                                className="h-11 w-full rounded-md border-[#cfc7b7] bg-white"
-                            >
-                                <GoogleIcon />
-                                Sign in with Google
-                            </Button>
-
-                            <p className="mt-6 text-center text-sm text-zinc-600">
+                            <p className="mt-6 text-sm text-zinc-600">
                                 {isLogin ? "Do not have an account?" : "Already have an account?"}
                                 {" "}
                                 <Link to={isLogin ? "/signup" : "/login"} className="font-semibold text-[#4d5818] hover:underline">
@@ -410,30 +408,29 @@ export default function AuthLayout({ isLogin = true }) {
                                 </Link>
                             </p>
                         </div>
-                    </div>
-                </section>
+                    </section>
 
-                <aside className="hidden min-h-screen bg-[#1f2613] px-8 py-8 text-white lg:flex lg:flex-col lg:justify-between">
-                    <div className="flex items-center gap-3 text-[#d6efa3]">
-                        <FileText className="size-5" strokeWidth={1.8} />
-                        <span className="text-sm font-medium">Tailored resumes and cover letters</span>
-                    </div>
-
-                    <div className="mx-auto w-full max-w-lg">
-                        <MiniWorkspacePreview />
-                        <h2 className="mt-8 text-3xl font-semibold tracking-tight">Keep every application packet in one focused workspace.</h2>
-                        <div className="mt-6 space-y-3">
-                            {authBenefits.map((benefit) => (
-                                <div key={benefit} className="flex items-center gap-2 text-sm text-zinc-200">
-                                    <CheckCircle2 className="size-4 text-[#d6efa3]" strokeWidth={1.8} />
-                                    {benefit}
-                                </div>
-                            ))}
+                    <aside className="hidden bg-[#1f2613] p-6 text-white lg:flex lg:items-center">
+                        <div className="mx-auto w-full max-w-md">
+                            <div className="mb-8 flex items-center gap-3 text-[#d6efa3]">
+                                <FileText className="size-5" strokeWidth={1.8} />
+                                <span className="text-sm font-medium">Tailored resumes and cover letters</span>
+                            </div>
+                            <MiniWorkspacePreview />
+                            <h2 className="mt-7 text-2xl font-semibold tracking-tight">
+                                Keep every application packet in one focused workspace.
+                            </h2>
+                            <div className="mt-5 space-y-3">
+                                {authBenefits.map((benefit) => (
+                                    <div key={benefit} className="flex items-center gap-2 text-sm text-zinc-200">
+                                        <CheckCircle2 className="size-4 text-[#d6efa3]" strokeWidth={1.8} />
+                                        {benefit}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-
-                    <p className="text-sm text-zinc-400">2026 Cover Pilot</p>
-                </aside>
+                    </aside>
+                </div>
             </div>
         </div>
     );
