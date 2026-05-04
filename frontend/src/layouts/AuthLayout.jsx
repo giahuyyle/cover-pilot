@@ -6,13 +6,11 @@ import {
     browserSessionPersistence,
     createUserWithEmailAndPassword,
     fetchSignInMethodsForEmail,
-    getRedirectResult,
     GoogleAuthProvider,
     sendPasswordResetEmail,
     setPersistence,
     signInWithEmailAndPassword,
     signInWithPopup,
-    signInWithRedirect,
     updateProfile,
 } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -77,13 +75,6 @@ const authBenefits = [
     "Choose provider and model for generation",
 ];
 
-let redirectResultPromise;
-
-const getSharedRedirectResult = () => {
-    redirectResultPromise ||= getRedirectResult(auth);
-    return redirectResultPromise;
-};
-
 function GoogleIcon() {
     return (
         <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
@@ -140,7 +131,6 @@ export default function AuthLayout({ isLogin = true }) {
     const [authError, setAuthError] = useState(null);
     const [authMessage, setAuthMessage] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [checkingRedirect, setCheckingRedirect] = useState(true);
     const [user] = useAuthState(auth);
     const navigate = useNavigate();
 
@@ -165,33 +155,8 @@ export default function AuthLayout({ isLogin = true }) {
     }, []);
 
     useEffect(() => {
-        let isMounted = true;
-
-        const completeRedirectSignIn = async () => {
-            try {
-                const result = await getSharedRedirectResult();
-
-                if (result?.user) {
-                    await syncUserProfileToBackend(result.user);
-                    navigate("/dashboard", { replace: true });
-                }
-            } catch (error) {
-                if (isMounted) setAuthError(error.message);
-            } finally {
-                if (isMounted) setCheckingRedirect(false);
-            }
-        };
-
-        completeRedirectSignIn();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [navigate, syncUserProfileToBackend]);
-
-    useEffect(() => {
-        if (!checkingRedirect && user) navigate("/dashboard");
-    }, [checkingRedirect, user, navigate]);
+        if (user) navigate("/dashboard");
+    }, [user, navigate]);
 
     const onSubmit = async (data) => {
         setAuthError(null);
@@ -244,13 +209,23 @@ export default function AuthLayout({ isLogin = true }) {
         setLoading(true);
         try {
             const provider = new GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: "select_account" });
             const result = await signInWithPopup(auth, provider);
             await syncUserProfileToBackend(result.user);
             navigate("/dashboard");
         } catch (error) {
             if (error.code === "auth/popup-blocked") {
-                const provider = new GoogleAuthProvider();
-                await signInWithRedirect(auth, provider);
+                setAuthError("Your browser blocked the Google sign-in popup. Please allow popups for Cover Pilot and try again.");
+                return;
+            }
+
+            if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
+                setAuthError("Google sign-in was closed before it finished.");
+                return;
+            }
+
+            if (error.code === "auth/unauthorized-domain") {
+                setAuthError("This domain is not authorized in Firebase Authentication. Add the current domain in Firebase, then try again.");
                 return;
             }
 
