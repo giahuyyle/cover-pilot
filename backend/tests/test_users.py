@@ -100,6 +100,116 @@ class UserServiceTests(SimpleTestCase):
         self.assertEqual(result["full_name"], "Taylor Avery")
 
     @patch("apps.users.services._users_ref")
+    def test_update_user_profile_normalizes_nested_resume_profile(self, users_ref_mock):
+        doc_ref = MagicMock()
+        users_ref_mock.return_value.document.return_value = doc_ref
+
+        result = update_user_profile(
+            "uid-1",
+            {
+                "basic": {
+                    "phone_country_code": " +1 ",
+                    "phone": " 555-0100 ",
+                    "contact_email": " taylor@example.com ",
+                    "location": " Edmonton, AB ",
+                    "headline": " Software Developer ",
+                    "github_url": " https://github.com/taylor ",
+                    "linkedin_url": " https://linkedin.com/in/taylor ",
+                    "portfolio_url": " https://taylor.dev ",
+                    "summary": " Builds useful software. ",
+                    "ignored": "nope",
+                },
+                "experience": [
+                    {
+                        "company": " Acme ",
+                        "role": " Developer ",
+                        "location": " Remote ",
+                        "start_date": " Jan 2024 ",
+                        "end_date": " Present ",
+                        "is_current": True,
+                        "description": [" Built APIs ", "", " Improved latency "],
+                        "ignored": "nope",
+                    }
+                ],
+                "projects": [
+                    {
+                        "name": " Cover Pilot ",
+                        "label": " Full-stack web application ",
+                        "stack": [" React ", " Django ", " Firebase ", " Tailwind ", " Vite ", " Extra "],
+                        "description": [" Generated resumes ", " Stored packets "],
+                        "live_url": " https://coverpilot.app ",
+                        "github_url": " https://github.com/taylor/cover-pilot ",
+                        "start_date": " Feb 2024 ",
+                        "end_date": " Apr 2024 ",
+                    }
+                ],
+                "education": [
+                    {
+                        "school": " University of Alberta ",
+                        "degree": " BSc ",
+                        "major": " Computing Science ",
+                        "location": " Edmonton ",
+                        "start_date": " 2020 ",
+                        "end_date": " 2024 ",
+                        "gpa": " 3.8/4.0 ",
+                        "awards": [" Dean's List ", ""],
+                        "relevant_coursework": [" Algorithms ", " Databases "],
+                    }
+                ],
+                "certificates": [
+                    {
+                        "name": " Cloud Practitioner ",
+                        "issuer": " AWS ",
+                        "issue_date": " 2024 ",
+                        "expiration_date": " 2027 ",
+                        "credential_id": " ABC123 ",
+                        "credential_url": " https://example.com/cert ",
+                    }
+                ],
+                "skills": [
+                    {"name": " React ", "category": " Frontend ", "ignored": "nope"},
+                ],
+            },
+            email="user@example.com",
+        )
+
+        payload = doc_ref.set.call_args.args[0]
+        self.assertEqual(payload["basic"]["phone_country_code"], "+1")
+        self.assertEqual(payload["basic"]["phone"], "555-0100")
+        self.assertNotIn("ignored", payload["basic"])
+        self.assertEqual(payload["experience"][0]["description"], ["Built APIs", "Improved latency"])
+        self.assertEqual(payload["projects"][0]["stack"], ["React", "Django", "Firebase", "Tailwind", "Vite"])
+        self.assertEqual(payload["projects"][0]["description"], ["Generated resumes", "Stored packets"])
+        self.assertEqual(payload["education"][0]["gpa"], "3.8/4.0")
+        self.assertEqual(payload["education"][0]["awards"], ["Dean's List"])
+        self.assertEqual(payload["education"][0]["relevant_coursework"], ["Algorithms", "Databases"])
+        self.assertEqual(payload["certificates"][0]["issuer"], "AWS")
+        self.assertEqual(payload["skills"][0], {"name": "React", "category": "Frontend"})
+        self.assertEqual(result["projects"][0]["stack"], ["React", "Django", "Firebase", "Tailwind", "Vite"])
+
+    @patch("apps.users.services._users_ref")
+    def test_update_user_profile_defaults_malformed_nested_fields(self, users_ref_mock):
+        doc_ref = MagicMock()
+        users_ref_mock.return_value.document.return_value = doc_ref
+
+        update_user_profile(
+            "uid-1",
+            {
+                "experience": [{"company": "Acme", "description": "not a list"}],
+                "projects": "not a list",
+                "education": [{"school": "U of A", "awards": None, "relevant_coursework": "Algorithms"}],
+                "skills": [{"name": "Python"}],
+            },
+        )
+
+        payload = doc_ref.set.call_args.args[0]
+        self.assertEqual(payload["experience"][0]["description"], [])
+        self.assertEqual(payload["projects"], [])
+        self.assertEqual(payload["education"][0]["awards"], [])
+        self.assertEqual(payload["education"][0]["relevant_coursework"], [])
+        self.assertEqual(payload["skills"][0]["category"], "")
+
+    @patch("apps.users.services._users_ref")
     def test_get_user_profile_normalizes_missing_name_fields(self, users_ref_mock):
         doc = MagicMock()
         doc.exists = True
@@ -116,3 +226,10 @@ class UserServiceTests(SimpleTestCase):
         self.assertEqual(result["uid"], "uid-1")
         self.assertEqual(result["display_name"], "Taylor")
         self.assertEqual(result["full_name"], "")
+        self.assertEqual(result["basic"]["phone_country_code"], "+1")
+        self.assertEqual(result["basic"]["phone"], "")
+        self.assertEqual(result["experience"], [])
+        self.assertEqual(result["projects"], [])
+        self.assertEqual(result["education"], [])
+        self.assertEqual(result["certificates"], [])
+        self.assertEqual(result["skills"], [])
