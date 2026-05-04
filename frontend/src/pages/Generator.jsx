@@ -38,9 +38,28 @@ const PROVIDER_MODELS = {
 
 const GUEST_PROVIDER = "openai";
 const GUEST_MODEL = "gpt-5.4-mini";
+const MAX_RESUME_BYTES = 10 * 1024 * 1024;
+const PDF_MIME_TYPE = "application/pdf";
 
 function getModelsForProvider(provider) {
     return PROVIDER_MODELS[provider] || [];
+}
+
+function isPdfFile(file) {
+    return file.type === PDF_MIME_TYPE || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function validateResumeFile(file) {
+    if (!file) {
+        return "Please upload your resume PDF.";
+    }
+    if (!isPdfFile(file)) {
+        return "Resume must be a PDF file.";
+    }
+    if (file.size > MAX_RESUME_BYTES) {
+        return "Resume PDF must be 10MB or smaller.";
+    }
+    return "";
 }
 
 export default function Generator() {
@@ -72,11 +91,22 @@ export default function Generator() {
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files?.[0] || null;
+
+        const fileError = validateResumeFile(selectedFile);
+        if (fileError) {
+            setFile(null);
+            setFileInputKey((prev) => prev + 1);
+            setError(fileError);
+            return;
+        }
+
         setFile(selectedFile);
+        setError("");
     };
 
     const handleRemoveFile = () => {
         setFile(null);
+        setError("");
         setFileInputKey((prev) => prev + 1);
     };
 
@@ -93,8 +123,9 @@ export default function Generator() {
         setIsPreviewOpen(false);
         setViewerFailed(false);
 
-        if (!file) {
-            setError("Please upload your resume PDF.");
+        const fileError = validateResumeFile(file);
+        if (fileError) {
+            setError(fileError);
             return;
         }
         if (!jobDesc.trim()) {
