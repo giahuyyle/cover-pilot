@@ -258,6 +258,7 @@ def save_to_firestore(
     document_name: str = "",
     company_name: str = "",
     position_name: str = "",
+    download_filename: str = "",
 ) -> tuple[str, str]:
     """Compile LaTeX to PDF, upload to S3 users/, and save user document metadata to Firestore."""
     pdf_bytes = _compile_latex_to_pdf(latex)
@@ -296,6 +297,7 @@ def save_to_firestore(
         "name": normalized_name,
         "company_name": normalized_company,
         "position_name": normalized_position,
+        "download_filename": _download_filename(download_filename) if download_filename else "",
         "template": template,
         "s3_key": key,
         "created_at": _format_timestamp(created_at),
@@ -313,6 +315,7 @@ def save_guest_to_firestore(
     document_name: str = "",
     company_name: str = "",
     position_name: str = "",
+    download_filename: str = "",
 ) -> tuple[str, str]:
     """Compile LaTeX to PDF, upload to S3 guests/, and save guest metadata in Firestore."""
     pdf_bytes = _compile_latex_to_pdf(latex)
@@ -351,6 +354,7 @@ def save_guest_to_firestore(
         "name": normalized_name,
         "company_name": normalized_company,
         "position_name": normalized_position,
+        "download_filename": _download_filename(download_filename) if download_filename else "",
         "template": template,
         "s3_key": key,
         "created_at": _format_timestamp(created_at),
@@ -390,6 +394,7 @@ def list_user_documents(uid: str, page=DEFAULT_STORAGE_PAGE, page_size=DEFAULT_S
         s3_key = payload.get("s3_key", "")
         expired = expired or not bool(s3_key)
         name = _sanitize_document_name(payload.get("name", "")) or _s3_filename(s3_key, doc.id)
+        download_name = _sanitize_document_name(payload.get("download_filename", ""))
         company_name = _sanitize_document_part(payload.get("company_name", ""))
         position_name = _sanitize_document_part(payload.get("position_name", ""))
 
@@ -405,7 +410,7 @@ def list_user_documents(uid: str, page=DEFAULT_STORAGE_PAGE, page_size=DEFAULT_S
         download_url = None
 
         if not expired and s3_key:
-            filename = _download_filename(name)
+            filename = _download_filename(download_name or name)
             view_url = _generate_presigned_get_url(
                 s3,
                 s3_key,
@@ -424,6 +429,7 @@ def list_user_documents(uid: str, page=DEFAULT_STORAGE_PAGE, page_size=DEFAULT_S
             "name": name,
             "company_name": company_name,
             "position_name": position_name,
+            "download_filename": download_name,
             "kind": payload.get("kind", "resume"),
             "template": payload.get("template", ""),
             "mode": payload.get("mode", "user"),

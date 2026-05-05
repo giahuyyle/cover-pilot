@@ -16,11 +16,12 @@ import { auth } from "@/lib/firebase";
 const guestItems = [
     { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
     { label: "Templates", icon: LayoutTemplate, to: "/templates" },
-    { label: "Generator", icon: Sparkles, to: "/generator" },
+    { label: "Tailor", icon: FileText, to: "/tailor" },
 ];
 
 const userItems = [
     ...guestItems,
+    { label: "Generator", icon: Sparkles, to: "/generator" },
     { label: "Storage", icon: HardDrive, to: "/storage" },
 ];
 

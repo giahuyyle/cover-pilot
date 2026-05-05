@@ -1,14 +1,8 @@
 from rest_framework import serializers
 
-from .enums import ResumeTemplate
 
-
-class ResumeGenerationSerializer(serializers.Serializer):
-    template = serializers.ChoiceField(
-        choices=ResumeTemplate.choices(),
-        default=ResumeTemplate.default(),
-    )
-    pdf = serializers.FileField()
+class ProfileResumeGenerationSerializer(serializers.Serializer):
+    role = serializers.CharField()
+    company_name = serializers.CharField(required=False, default="", allow_blank=True)
+    job_description = serializers.CharField(required=False, default="", allow_blank=True)
     prompt = serializers.CharField(required=False, default="", allow_blank=True)
-    job_description = serializers.CharField()
-    guest_id = serializers.CharField(required=False, default="", allow_blank=True)

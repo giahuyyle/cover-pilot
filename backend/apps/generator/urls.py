@@ -1,7 +1,7 @@
 from django.urls import path
 
-from .views import GenerateResumeView
+from .views import GenerateProfileResumeView
 
 urlpatterns = [
-    path("<str:provider>/<str:model>/", GenerateResumeView.as_view()),
+    path("<str:provider>/<str:model>/", GenerateProfileResumeView.as_view()),
 ]

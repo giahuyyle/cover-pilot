@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from apps.generator.enums import ResumeTemplate
+from apps.tailor.enums import ResumeTemplate
 
 
 class ResumeTemplateTests(SimpleTestCase):

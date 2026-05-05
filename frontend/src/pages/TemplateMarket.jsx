@@ -176,7 +176,7 @@ export default function TemplateMarket() {
                                         {template.category}
                                     </span>
                                     <Button asChild variant="outline" size="sm" className="rounded-md border-[#cfc7b7] bg-white">
-                                        <Link to="/generator">
+                                        <Link to="/tailor">
                                             Use
                                             <ArrowRight className="size-4" strokeWidth={1.8} />
                                         </Link>

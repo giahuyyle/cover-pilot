@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
-import { FileCheck2, FileText, Loader2, PanelRightOpen, Sparkles, Upload, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, FileText, Loader2, PanelRightOpen, Sparkles, UserRound } from "lucide-react";
+import { Link } from "react-router";
+import { useAuthState } from "react-firebase-hooks/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,17 +11,8 @@ import {
     SelectContent,
     SelectItem,
 } from "@/components/ui/select";
-import { apiUpload } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { auth } from "@/lib/firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
-
-const TEMPLATES = [
-    { value: "classic", label: "Classic" },
-    { value: "modern", label: "Modern" },
-    { value: "minimal", label: "Minimal" },
-    { value: "academic", label: "Academic" },
-    { value: "jakes", label: "Jake's Resume" },
-];
 
 const PROVIDERS = [
     { value: "openai", label: "OpenAI" },
@@ -37,30 +30,11 @@ const PROVIDER_MODELS = {
     ],
 };
 
-const GUEST_PROVIDER = "openai";
-const GUEST_MODEL = "gpt-5.4-mini";
-const MAX_RESUME_BYTES = 10 * 1024 * 1024;
-const PDF_MIME_TYPE = "application/pdf";
+const DEFAULT_PROVIDER = "openai";
+const DEFAULT_MODEL = "gpt-5.4-mini";
 
 function getModelsForProvider(provider) {
     return PROVIDER_MODELS[provider] || [];
-}
-
-function isPdfFile(file) {
-    return file.type === PDF_MIME_TYPE || file.name.toLowerCase().endsWith(".pdf");
-}
-
-function validateResumeFile(file) {
-    if (!file) {
-        return "Please upload your resume PDF.";
-    }
-    if (!isPdfFile(file)) {
-        return "Resume must be a PDF file.";
-    }
-    if (file.size > MAX_RESUME_BYTES) {
-        return "Resume PDF must be 10MB or smaller.";
-    }
-    return "";
 }
 
 function FieldLabel({ children }) {
@@ -75,53 +49,79 @@ function FormPanel({ children, className = "" }) {
     );
 }
 
+function countItems(value) {
+    return Array.isArray(value) ? value.length : 0;
+}
+
+function buildProfileStats(profile) {
+    return [
+        { label: "Work entries", value: countItems(profile?.experience), target: "2-3" },
+        { label: "Projects", value: countItems(profile?.projects), target: "2-3" },
+        { label: "Education", value: countItems(profile?.education), target: "1+" },
+        { label: "Skills", value: countItems(profile?.skills), target: "Role matched" },
+    ];
+}
+
+function getReadiness(profile) {
+    const experienceCount = countItems(profile?.experience);
+    const projectCount = countItems(profile?.projects);
+    const totalEvidence = experienceCount + projectCount;
+    if (!profile) return { label: "Loading", ready: false };
+    if (totalEvidence >= 5 && experienceCount >= 2 && projectCount >= 2) return { label: "Strong profile", ready: true };
+    if (totalEvidence > 0) return { label: "Best effort", ready: true };
+    return { label: "Needs profile data", ready: false };
+}
+
 export default function Generator() {
     const [user, authLoading] = useAuthState(auth);
-    const [template, setTemplate] = useState(TEMPLATES[0].value);
-    const [provider, setProvider] = useState(GUEST_PROVIDER);
-    const [model, setModel] = useState(GUEST_MODEL);
+    const [profile, setProfile] = useState(null);
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [profileError, setProfileError] = useState("");
+    const [provider, setProvider] = useState(DEFAULT_PROVIDER);
+    const [model, setModel] = useState(DEFAULT_MODEL);
+    const [role, setRole] = useState("");
+    const [companyName, setCompanyName] = useState("");
     const [jobDesc, setJobDesc] = useState("");
     const [extraInstructions, setExtraInstructions] = useState("");
-    const [file, setFile] = useState(null);
-    const [fileInputKey, setFileInputKey] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [warnings, setWarnings] = useState([]);
     const [resultUrl, setResultUrl] = useState("");
+    const [documentName, setDocumentName] = useState("");
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [viewerFailed, setViewerFailed] = useState(false);
-    const isGuest = !authLoading && !user;
 
     useEffect(() => {
-        if (isGuest) {
-            setProvider(GUEST_PROVIDER);
-            setModel(GUEST_MODEL);
-        }
-    }, [isGuest]);
-
-    const availableModels = getModelsForProvider(provider);
-    const hasResult = Boolean(resultUrl);
-    const showPreview = hasResult && isPreviewOpen;
-
-    const handleFileChange = (event) => {
-        const selectedFile = event.target.files?.[0] || null;
-        const fileError = validateResumeFile(selectedFile);
-
-        if (fileError) {
-            setFile(null);
-            setFileInputKey((prev) => prev + 1);
-            setError(fileError);
+        if (!user) {
+            setProfile(null);
             return;
         }
 
-        setFile(selectedFile);
-        setError("");
-    };
+        let mounted = true;
+        const loadProfile = async () => {
+            setProfileLoading(true);
+            setProfileError("");
+            try {
+                const payload = await apiFetch("/api/users/me/");
+                if (mounted) setProfile(payload);
+            } catch (nextError) {
+                if (mounted) setProfileError(nextError?.message || "Failed to load profile.");
+            } finally {
+                if (mounted) setProfileLoading(false);
+            }
+        };
 
-    const handleRemoveFile = () => {
-        setFile(null);
-        setError("");
-        setFileInputKey((prev) => prev + 1);
-    };
+        loadProfile();
+        return () => {
+            mounted = false;
+        };
+    }, [user]);
+
+    const availableModels = getModelsForProvider(provider);
+    const profileStats = useMemo(() => buildProfileStats(profile), [profile]);
+    const readiness = useMemo(() => getReadiness(profile), [profile]);
+    const hasResult = Boolean(resultUrl);
+    const showPreview = hasResult && isPreviewOpen;
 
     const handleProviderChange = (nextProvider) => {
         setProvider(nextProvider);
@@ -132,17 +132,14 @@ export default function Generator() {
     const handleSubmit = async (event) => {
         event.preventDefault();
         setError("");
+        setWarnings([]);
         setResultUrl("");
+        setDocumentName("");
         setIsPreviewOpen(false);
         setViewerFailed(false);
 
-        const fileError = validateResumeFile(file);
-        if (fileError) {
-            setError(fileError);
-            return;
-        }
-        if (!jobDesc.trim()) {
-            setError("Please paste the job description.");
+        if (!role.trim()) {
+            setError("Please enter the role you want to apply to.");
             return;
         }
         if (!provider || !model) {
@@ -150,53 +147,58 @@ export default function Generator() {
             return;
         }
 
-        const form = new FormData();
-        form.append("template", template);
-        form.append("pdf", file);
-        form.append("job_description", jobDesc);
-        form.append("prompt", extraInstructions.trim());
-
         try {
             setLoading(true);
             const path = `/api/generate/${encodeURIComponent(provider)}/${encodeURIComponent(model)}/`;
-            const data = await apiUpload(path, form);
+            const data = await apiFetch(path, {
+                method: "POST",
+                body: JSON.stringify({
+                    role: role.trim(),
+                    company_name: companyName.trim(),
+                    job_description: jobDesc.trim(),
+                    prompt: extraInstructions.trim(),
+                }),
+            });
             const nextUrl = data?.pdf_url || "";
             setResultUrl(nextUrl);
+            setDocumentName(data?.document_name || "");
+            setWarnings(Array.isArray(data?.warnings) ? data.warnings : []);
             setIsPreviewOpen(Boolean(nextUrl));
             setViewerFailed(false);
         } catch (err) {
-            setError(typeof err?.message === "string" ? err.message : "Failed to generate.");
+            setError(typeof err?.message === "string" ? err.message : "Failed to generate resume.");
         } finally {
             setLoading(false);
         }
     };
 
+    if (authLoading) {
+        return (
+            <div className="mx-auto max-w-7xl px-4 pb-24 text-sm text-zinc-600 sm:px-6 lg:px-8">
+                Loading generator...
+            </div>
+        );
+    }
+
     return (
         <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
-            <header className="mb-8 grid gap-6 border-b border-[#e3dece] pb-6 lg:grid-cols-[1fr_360px] lg:items-end">
+            <header className="mb-8 grid gap-6 border-b border-[#e3dece] pb-6 lg:grid-cols-[1fr_380px] lg:items-end">
                 <div>
-                    <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Generate application packet</h1>
+                    <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Generate from profile</h1>
                     <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
-                        Upload your resume, paste the role, choose a template, and generate a tailored document for your next application.
+                        Create a new Jake-style resume from your saved profile, targeted to the role you want next.
                     </p>
-                    {isGuest && (
-                        <p className="mt-3 max-w-2xl rounded-md border border-[#e5dfd0] bg-[#fffdf8] px-3 py-2 text-sm text-zinc-600">
-                            Guest mode uses the default OpenAI model. Sign in to unlock provider and model selection.
-                        </p>
-                    )}
                 </div>
 
                 <FormPanel className="p-4">
                     <div className="flex items-center gap-3">
                         <div className="flex size-11 items-center justify-center rounded-md bg-[#eef2d8] text-[#5d681c]">
-                            <FileCheck2 className="size-5" strokeWidth={1.8} />
+                            <UserRound className="size-5" strokeWidth={1.8} />
                         </div>
-                        <div>
-                            <p className="text-sm font-semibold text-zinc-950">Packet readiness</p>
-                            <p className="text-xs text-zinc-600">
-                                {file ? "Resume attached" : "Waiting for resume"}
-                                {" | "}
-                                {jobDesc.trim() ? "Role added" : "Role needed"}
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-zinc-950">Profile readiness</p>
+                            <p className={`text-xs ${readiness.ready ? "text-[#5d681c]" : "text-zinc-600"}`}>
+                                {profileLoading ? "Checking saved profile..." : readiness.label}
                             </p>
                         </div>
                     </div>
@@ -206,96 +208,58 @@ export default function Generator() {
             <div className={`grid gap-6 ${showPreview ? "xl:grid-cols-[0.82fr_1.18fr]" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
                 <FormPanel className="p-5 lg:p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className={`grid gap-4 ${isGuest ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                             <div className="space-y-2">
-                                <FieldLabel>Template</FieldLabel>
-                                <Select value={template} onValueChange={setTemplate}>
+                                <FieldLabel>Role</FieldLabel>
+                                <Input
+                                    value={role}
+                                    onChange={(event) => setRole(event.target.value)}
+                                    placeholder="Software Engineer"
+                                    className="h-11 rounded-lg border-[#d9d2c2] bg-white"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FieldLabel>Company</FieldLabel>
+                                <Input
+                                    value={companyName}
+                                    onChange={(event) => setCompanyName(event.target.value)}
+                                    placeholder="Optional"
+                                    className="h-11 rounded-lg border-[#d9d2c2] bg-white"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FieldLabel>AI Provider</FieldLabel>
+                                <Select value={provider} onValueChange={handleProviderChange}>
                                     <SelectTrigger className="h-11 w-full border-[#d9d2c2] bg-white">
-                                        <SelectValue placeholder="Select template" />
+                                        <SelectValue placeholder="Select provider" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {TEMPLATES.map((item) => (
+                                        {PROVIDERS.map((item) => (
                                             <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            {!isGuest && (
-                                <div className="space-y-2">
-                                    <FieldLabel>AI Provider</FieldLabel>
-                                    <Select value={provider} onValueChange={handleProviderChange}>
-                                        <SelectTrigger className="h-11 w-full border-[#d9d2c2] bg-white">
-                                            <SelectValue placeholder="Select provider" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {PROVIDERS.map((item) => (
-                                                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-
-                            {!isGuest && (
-                                <div className="space-y-2">
-                                    <FieldLabel>AI Model</FieldLabel>
-                                    <Select value={model} onValueChange={setModel}>
-                                        <SelectTrigger className="h-11 w-full border-[#d9d2c2] bg-white">
-                                            <SelectValue placeholder="Select model" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availableModels.map((item) => (
-                                                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <FieldLabel>Resume PDF</FieldLabel>
-                            <Input
-                                key={fileInputKey}
-                                id="resume-upload"
-                                type="file"
-                                accept="application/pdf"
-                                onChange={handleFileChange}
-                                className="sr-only"
-                            />
-                            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-[#cfc7b7] bg-[#faf8f1] p-4">
-                                <label
-                                    htmlFor="resume-upload"
-                                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md bg-[#5d681c] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
-                                >
-                                    <Upload className="size-4" strokeWidth={1.8} />
-                                    Choose PDF
-                                </label>
-                                <p className="min-w-0 flex-1 truncate text-sm text-zinc-600">
-                                    {file ? file.name : "No file selected"}
-                                </p>
-                                {file && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="rounded-md border-[#cfc7b7] bg-white"
-                                        onClick={handleRemoveFile}
-                                    >
-                                        <X className="size-4" strokeWidth={1.8} />
-                                        Remove
-                                    </Button>
-                                )}
+                            <div className="space-y-2">
+                                <FieldLabel>AI Model</FieldLabel>
+                                <Select value={model} onValueChange={setModel}>
+                                    <SelectTrigger className="h-11 w-full border-[#d9d2c2] bg-white">
+                                        <SelectValue placeholder="Select model" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableModels.map((item) => (
+                                            <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <p className="text-xs text-zinc-500">PDF only. Maximum file size is 10MB.</p>
                         </div>
 
                         <div className="space-y-2">
-                            <FieldLabel>Job description</FieldLabel>
+                            <FieldLabel>Job posting</FieldLabel>
                             <textarea
-                                className="min-h-48 w-full rounded-lg border border-[#d9d2c2] bg-white px-3 py-3 text-sm leading-6 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:border-[#9fa76f] focus:ring-3 focus:ring-[#d8dfb6]/50"
-                                placeholder="Paste the job description here..."
+                                className="min-h-44 w-full rounded-lg border border-[#d9d2c2] bg-white px-3 py-3 text-sm leading-6 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:border-[#9fa76f] focus:ring-3 focus:ring-[#d8dfb6]/50"
+                                placeholder="Optional. Paste the posting for stronger project and skill selection."
                                 value={jobDesc}
                                 onChange={(event) => setJobDesc(event.target.value)}
                             />
@@ -304,19 +268,32 @@ export default function Generator() {
                         <div className="space-y-2">
                             <FieldLabel>Extra instructions</FieldLabel>
                             <textarea
-                                className="min-h-28 w-full rounded-lg border border-[#d9d2c2] bg-white px-3 py-3 text-sm leading-6 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:border-[#9fa76f] focus:ring-3 focus:ring-[#d8dfb6]/50"
-                                placeholder="Example: emphasize customer-facing product launches and quantify team impact."
+                                className="min-h-24 w-full rounded-lg border border-[#d9d2c2] bg-white px-3 py-3 text-sm leading-6 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:border-[#9fa76f] focus:ring-3 focus:ring-[#d8dfb6]/50"
+                                placeholder="Example: prioritize AI platform work and backend systems."
                                 value={extraInstructions}
                                 onChange={(event) => setExtraInstructions(event.target.value)}
                             />
                         </div>
 
+                        {profileError && (
+                            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{profileError}</div>
+                        )}
+                        {warnings.length > 0 && (
+                            <div className="space-y-2 rounded-md border border-[#e2c56d] bg-[#fff8df] px-3 py-3 text-sm text-[#6b5316]">
+                                {warnings.map((warning) => (
+                                    <div key={warning} className="flex gap-2">
+                                        <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={1.8} />
+                                        <span>{warning}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         {error && (
                             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
                         )}
 
                         <div className="flex flex-wrap items-center gap-3">
-                            <Button type="submit" className="h-11 rounded-md bg-[#5d681c] px-6 text-white hover:bg-[#4d5818]" disabled={loading}>
+                            <Button type="submit" className="h-11 rounded-md bg-[#5d681c] px-6 text-white hover:bg-[#4d5818]" disabled={loading || profileLoading}>
                                 {loading ? (
                                     <>
                                         <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
@@ -325,7 +302,7 @@ export default function Generator() {
                                 ) : (
                                     <>
                                         <Sparkles className="size-4" strokeWidth={1.8} />
-                                        Generate packet
+                                        Generate resume
                                     </>
                                 )}
                             </Button>
@@ -355,37 +332,30 @@ export default function Generator() {
                 {showPreview ? (
                     <FormPanel className="overflow-hidden">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5dfd0] bg-[#faf8f1] px-4 py-3">
-                            <div className="flex items-center gap-2">
-                                <FileText className="size-4 text-[#5d681c]" strokeWidth={1.8} />
-                                <h2 className="text-sm font-semibold text-zinc-950">Generated PDF preview</h2>
+                            <div className="flex min-w-0 items-center gap-2">
+                                <FileText className="size-4 shrink-0 text-[#5d681c]" strokeWidth={1.8} />
+                                <h2 className="truncate text-sm font-semibold text-zinc-950">{documentName || "Generated resume"}</h2>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button asChild variant="outline" size="sm" className="rounded-md border-[#cfc7b7] bg-white">
-                                    <a href={resultUrl || "#"} target="_blank" rel="noreferrer">Open</a>
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="rounded-md"
-                                    onClick={() => setIsPreviewOpen(false)}
-                                >
-                                    Close
-                                </Button>
-                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-md"
+                                onClick={() => setIsPreviewOpen(false)}
+                            >
+                                Close
+                            </Button>
                         </div>
-
                         <div className="p-3">
-                            {!viewerFailed && (
+                            {!viewerFailed ? (
                                 <iframe
-                                    title="generated-resume-preview"
+                                    title="generated-profile-resume-preview"
                                     src={resultUrl}
                                     className="h-[78vh] min-h-136 w-full rounded-lg border border-[#ded7c8] bg-white"
                                     onError={() => setViewerFailed(true)}
                                     onLoad={() => setViewerFailed(false)}
                                 />
-                            )}
-                            {viewerFailed && (
+                            ) : (
                                 <div className="rounded-lg border border-[#ded7c8] bg-white p-4 text-sm text-zinc-600">
                                     Inline PDF preview is unavailable in this browser or for this file URL.{" "}
                                     <a href={resultUrl} target="_blank" rel="noreferrer" className="font-medium text-[#4d5818] underline">
@@ -398,28 +368,31 @@ export default function Generator() {
                 ) : (
                     <aside className="space-y-4">
                         <FormPanel className="p-5">
-                            <h2 className="text-base font-semibold text-zinc-950">Generation checklist</h2>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="text-base font-semibold text-zinc-950">Profile evidence</h2>
+                                    <p className="mt-1 text-sm leading-6 text-zinc-600">
+                                        The generator chooses the closest work and project entries from saved profile data.
+                                    </p>
+                                </div>
+                                <Button asChild variant="outline" size="sm" className="rounded-md border-[#cfc7b7] bg-white">
+                                    <Link to="/profile">Edit</Link>
+                                </Button>
+                            </div>
                             <div className="mt-4 space-y-3">
-                                {[
-                                    { label: "Resume attached", done: Boolean(file) },
-                                    { label: "Job post added", done: Boolean(jobDesc.trim()) },
-                                    { label: "Template selected", done: Boolean(template) },
-                                    { label: "Model selected", done: Boolean(model) },
-                                ].map((item) => (
+                                {profileStats.map((item) => (
                                     <div key={item.label} className="flex items-center justify-between rounded-md border border-[#e5dfd0] bg-white px-3 py-2 text-sm">
                                         <span className="text-zinc-700">{item.label}</span>
-                                        <span className={item.done ? "font-medium text-[#5d681c]" : "text-zinc-400"}>
-                                            {item.done ? "Ready" : "Needed"}
-                                        </span>
+                                        <span className="font-medium text-zinc-900">{item.value} / {item.target}</span>
                                     </div>
                                 ))}
                             </div>
                         </FormPanel>
 
                         <FormPanel className="border-[#cbd3ad] bg-[#f4f6e8] p-5">
-                            <h2 className="text-base font-semibold text-zinc-950">Output</h2>
+                            <h2 className="text-base font-semibold text-zinc-950">Selection rule</h2>
                             <p className="mt-2 text-sm leading-6 text-zinc-700">
-                                Cover Pilot returns a PDF preview when generation succeeds. Saved user documents also appear in storage while available.
+                                When enough evidence exists, the API asks for 2-3 work experiences and 2-3 projects, five entries total.
                             </p>
                         </FormPanel>
                     </aside>

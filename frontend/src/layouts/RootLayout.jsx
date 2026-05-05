@@ -7,7 +7,7 @@ import GuestUpsellModal from "@/components/GuestUpsellModal";
 import { auth } from "@/lib/firebase";
 
 const GUEST_UPSELL_SEEN_KEY = "coverpilot_guest_upsell_seen";
-const GUEST_ENTRY_PATHS = ["/dashboard", "/templates", "/generator"];
+const GUEST_ENTRY_PATHS = ["/dashboard", "/templates", "/tailor"];
 
 function isGuestEntryPath(pathname) {
     return GUEST_ENTRY_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));

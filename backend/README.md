@@ -39,12 +39,13 @@ backend/
     │   ├── views.py                # ProfileView
     │   └── urls.py
     │
-    └── generator/                  # Resume generation pipeline
+    ├── tailor/                     # PDF upload tailoring pipeline
         ├── enums.py                # ResumeTemplate enum (classic/modern/minimal/academic/jakes)
         ├── serializers.py          # Request validation (pdf, template, prompt, job_description)
         ├── services.py             # PDF extraction + AI API call + LaTeX output
         ├── views.py                # GenerateResumeView
         └── urls.py
+    └── generator/                  # Profile-based Jake resume generation
 ```
 
 ---
@@ -65,13 +66,13 @@ backend/
 | GET | `/api/users/me/` | Yes | Get current user's profile |
 | PUT | `/api/users/me/` | Yes | Update current user's profile |
 
-### Generator
+### Tailor
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/generate/{provider}/{model}/` | Yes | Generate optimized resume PDF URL |
+| POST | `/api/tailor/{provider}/{model}/` | Optional | Tailor an uploaded resume PDF to a job posting |
 
-#### POST `/api/generate/{provider}/{model}/` — Request (multipart/form-data)
+#### POST `/api/tailor/{provider}/{model}/` — Request (multipart/form-data)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -86,13 +87,43 @@ backend/
 - `openai`: `gpt-5.4-mini`, `gpt-5.2`
 - `anthropic`: `claude-sonnet-4-5`, `claude-sonnet-4-6`
 
-#### POST `/api/generate/{provider}/{model}/` — Response
+#### POST `/api/tailor/{provider}/{model}/` — Response
 
 ```json
 {
   "pdf_url": "https://...",
   "template": "modern",
   "mode": "guest"
+}
+```
+
+### Generator
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/generate/{provider}/{model}/` | Yes | Generate a Jake-style resume from the saved user profile |
+
+#### POST `/api/generate/{provider}/{model}/` — Request (application/json)
+
+```json
+{
+  "role": "Software Engineer",
+  "company_name": "Optional Company",
+  "job_description": "Optional posting text",
+  "prompt": "Optional extra instructions"
+}
+```
+
+#### POST `/api/generate/{provider}/{model}/` — Response
+
+```json
+{
+  "pdf_url": "https://...",
+  "template": "jakes",
+  "mode": "user",
+  "doc_id": "abc123",
+  "document_name": "Optional Company - Software Engineer",
+  "warnings": []
 }
 ```
 

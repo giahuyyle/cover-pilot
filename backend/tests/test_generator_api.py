@@ -4,7 +4,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.generator.views import GenerateResumeView
+from apps.tailor.views import GenerateResumeView
 
 
 class GenerateResumeApiTests(SimpleTestCase):
@@ -12,7 +12,7 @@ class GenerateResumeApiTests(SimpleTestCase):
         self.factory = APIRequestFactory()
         self.view = GenerateResumeView.as_view()
         self.document_name_patcher = patch(
-            "apps.generator.views.summarize_document_identity",
+            "apps.tailor.views.summarize_document_identity",
             return_value=("Acme Corp", "Software Engineer", "Acme Corp - Software Engineer"),
         )
         self.mock_document_name = self.document_name_patcher.start()
@@ -21,7 +21,7 @@ class GenerateResumeApiTests(SimpleTestCase):
     def _build_request(self):
         pdf = SimpleUploadedFile("resume.pdf", b"%PDF-1.4 test", content_type="application/pdf")
         return self.factory.post(
-            "/api/generate/openai/gpt-5.4-mini/",
+            "/api/tailor/openai/gpt-5.4-mini/",
             {
                 "template": "classic",
                 "pdf": pdf,
@@ -31,8 +31,8 @@ class GenerateResumeApiTests(SimpleTestCase):
             format="multipart",
         )
 
-    @patch("apps.generator.views.save_to_s3_temp", return_value="https://example.com/generated.pdf")
-    @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
+    @patch("apps.tailor.views.save_to_s3_temp", return_value="https://example.com/generated.pdf")
+    @patch("apps.tailor.views.process_resume_request", return_value=("latex", "classic"))
     def test_post_openai_provider_model_success(self, process_mock, save_mock):
         request = self._build_request()
         response = self.view(request, provider="openai", model="gpt-5.4-mini")
@@ -48,8 +48,8 @@ class GenerateResumeApiTests(SimpleTestCase):
         self.assertEqual(called["model"], "gpt-5.4-mini")
         save_mock.assert_called_once_with("latex", "classic")
 
-    @patch("apps.generator.views.save_to_s3_temp", return_value="https://example.com/generated.pdf")
-    @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
+    @patch("apps.tailor.views.save_to_s3_temp", return_value="https://example.com/generated.pdf")
+    @patch("apps.tailor.views.process_resume_request", return_value=("latex", "classic"))
     def test_post_anthropic_provider_model_success(self, process_mock, save_mock):
         request = self._build_request()
         response = self.view(request, provider="anthropic", model="claude-sonnet-4-6")
@@ -60,7 +60,7 @@ class GenerateResumeApiTests(SimpleTestCase):
         self.assertEqual(called["model"], "claude-sonnet-4-6")
         save_mock.assert_called_once()
 
-    @patch("apps.generator.views.process_resume_request")
+    @patch("apps.tailor.views.process_resume_request")
     def test_post_invalid_provider_returns_400(self, process_mock):
         request = self._build_request()
         response = self.view(request, provider="invalid", model="gpt-5.4-mini")
@@ -68,7 +68,7 @@ class GenerateResumeApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 400)
         process_mock.assert_not_called()
 
-    @patch("apps.generator.views.process_resume_request")
+    @patch("apps.tailor.views.process_resume_request")
     def test_post_invalid_model_for_provider_returns_400(self, process_mock):
         request = self._build_request()
         response = self.view(request, provider="openai", model="claude-sonnet-4-6")
@@ -76,12 +76,12 @@ class GenerateResumeApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 400)
         process_mock.assert_not_called()
 
-    @patch("apps.generator.views.save_to_s3_temp", return_value="https://example.com/generated.pdf")
-    @patch("apps.generator.views.process_resume_request", return_value=("latex", "jakes"))
+    @patch("apps.tailor.views.save_to_s3_temp", return_value="https://example.com/generated.pdf")
+    @patch("apps.tailor.views.process_resume_request", return_value=("latex", "jakes"))
     def test_post_accepts_jakes_template(self, process_mock, save_mock):
         pdf = SimpleUploadedFile("resume.pdf", b"%PDF-1.4 test", content_type="application/pdf")
         request = self.factory.post(
-            "/api/generate/openai/gpt-5.4-mini/",
+            "/api/tailor/openai/gpt-5.4-mini/",
             {
                 "template": "jakes",
                 "pdf": pdf,
@@ -96,8 +96,8 @@ class GenerateResumeApiTests(SimpleTestCase):
         process_mock.assert_called_once()
         save_mock.assert_called_once_with("latex", "jakes")
 
-    @patch("apps.generator.views.save_to_firestore", return_value=("doc-123", "https://example.com/user.pdf"))
-    @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
+    @patch("apps.tailor.views.save_to_firestore", return_value=("doc-123", "https://example.com/user.pdf"))
+    @patch("apps.tailor.views.process_resume_request", return_value=("latex", "classic"))
     def test_post_authenticated_user_stores_user_document(self, process_mock, save_user_mock):
         request = self._build_request()
         force_authenticate(request, user={"uid": "user-1", "email": "user@example.com"})
@@ -117,13 +117,13 @@ class GenerateResumeApiTests(SimpleTestCase):
         )
         process_mock.assert_called_once()
 
-    @patch("apps.generator.views.save_to_s3_temp")
-    @patch("apps.generator.views.save_guest_to_firestore", return_value=("guest-doc-1", "https://example.com/guest.pdf"))
-    @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
+    @patch("apps.tailor.views.save_to_s3_temp")
+    @patch("apps.tailor.views.save_guest_to_firestore", return_value=("guest-doc-1", "https://example.com/guest.pdf"))
+    @patch("apps.tailor.views.process_resume_request", return_value=("latex", "classic"))
     def test_post_guest_with_guest_id_stores_guest_document(self, process_mock, save_guest_mock, save_temp_mock):
         pdf = SimpleUploadedFile("resume.pdf", b"%PDF-1.4 test", content_type="application/pdf")
         request = self.factory.post(
-            "/api/generate/openai/gpt-5.4-mini/",
+            "/api/tailor/openai/gpt-5.4-mini/",
             {
                 "template": "classic",
                 "pdf": pdf,
@@ -149,13 +149,13 @@ class GenerateResumeApiTests(SimpleTestCase):
         save_temp_mock.assert_not_called()
         process_mock.assert_called_once()
 
-    @patch("apps.generator.views.save_to_s3_temp")
-    @patch("apps.generator.views.save_guest_to_firestore", return_value=("guest-doc-1", "https://example.com/guest.pdf"))
-    @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
+    @patch("apps.tailor.views.save_to_s3_temp")
+    @patch("apps.tailor.views.save_guest_to_firestore", return_value=("guest-doc-1", "https://example.com/guest.pdf"))
+    @patch("apps.tailor.views.process_resume_request", return_value=("latex", "classic"))
     def test_post_guest_with_query_guest_id_stores_guest_document(self, process_mock, save_guest_mock, save_temp_mock):
         pdf = SimpleUploadedFile("resume.pdf", b"%PDF-1.4 test", content_type="application/pdf")
         request = self.factory.post(
-            "/api/generate/openai/gpt-5.4-mini/?guest_id=guest-query",
+            "/api/tailor/openai/gpt-5.4-mini/?guest_id=guest-query",
             {
                 "template": "classic",
                 "pdf": pdf,
@@ -179,9 +179,9 @@ class GenerateResumeApiTests(SimpleTestCase):
         save_temp_mock.assert_not_called()
         process_mock.assert_called_once()
 
-    @patch("apps.generator.views.save_to_s3_temp", return_value="https://example.com/guest-temp.pdf")
-    @patch("apps.generator.views.save_guest_to_firestore")
-    @patch("apps.generator.views.process_resume_request", return_value=("latex", "classic"))
+    @patch("apps.tailor.views.save_to_s3_temp", return_value="https://example.com/guest-temp.pdf")
+    @patch("apps.tailor.views.save_guest_to_firestore")
+    @patch("apps.tailor.views.process_resume_request", return_value=("latex", "classic"))
     def test_post_guest_without_guest_id_returns_temp_url(self, process_mock, save_guest_mock, save_temp_mock):
         request = self._build_request()
 

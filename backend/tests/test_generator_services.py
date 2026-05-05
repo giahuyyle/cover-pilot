@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase, override_settings
 
-from apps.generator import services
+from apps.tailor import services
 
 VALID_JAKES_SNIPPETS = r"""
 [[[HEADER]]]
@@ -94,8 +94,8 @@ class GeneratorServicesTests(SimpleTestCase):
         with self.assertRaisesRegex(RuntimeError, "ANTHROPIC_API_KEY"):
             services._generate_with_anthropic("claude-sonnet-4-6", "test prompt")
 
-    @patch("apps.generator.services.generate_latex_resume", return_value="latex")
-    @patch("apps.generator.services.extract_pdf_text", return_value="resume text")
+    @patch("apps.tailor.services.generate_latex_resume", return_value="latex")
+    @patch("apps.tailor.services.extract_pdf_text", return_value="resume text")
     def test_process_resume_request_forwards_provider_and_model(self, extract_mock, generate_mock):
         latex, template = services.process_resume_request(
             pdf_file=object(),
@@ -117,7 +117,7 @@ class GeneratorServicesTests(SimpleTestCase):
             prompt="custom prompt",
         )
 
-    @patch("apps.generator.services._generate_with_openai", return_value=VALID_JAKES_SNIPPETS)
+    @patch("apps.tailor.services._generate_with_openai", return_value=VALID_JAKES_SNIPPETS)
     def test_generate_latex_resume_jakes_renders_locked_shell(self, openai_mock):
         latex = services.generate_latex_resume(
             resume_text="Resume text",
@@ -134,7 +134,7 @@ class GeneratorServicesTests(SimpleTestCase):
         self.assertNotIn("%%__JAKES_HEADER__%%", latex)
         openai_mock.assert_called_once()
 
-    @patch("apps.generator.services._generate_with_openai")
+    @patch("apps.tailor.services._generate_with_openai")
     def test_generate_latex_resume_jakes_rejects_forbidden_commands(self, openai_mock):
         malicious = VALID_JAKES_SNIPPETS.replace(
             r"\textbf{\Huge \scshape Jane Candidate}",
@@ -152,7 +152,7 @@ class GeneratorServicesTests(SimpleTestCase):
                 prompt="",
             )
 
-    @patch("apps.generator.services._generate_with_openai", return_value=LOOSE_HEADER_JAKES_SNIPPETS)
+    @patch("apps.tailor.services._generate_with_openai", return_value=LOOSE_HEADER_JAKES_SNIPPETS)
     def test_generate_latex_resume_jakes_normalizes_loose_header(self, openai_mock):
         latex = services.generate_latex_resume(
             resume_text="Resume text",
@@ -170,7 +170,7 @@ class GeneratorServicesTests(SimpleTestCase):
         self.assertIn(r"\href{https://linkedin.com/in/jane}{\underline{linkedin.com/in/jane}}", latex)
         openai_mock.assert_called_once()
 
-    @patch("apps.generator.services._generate_with_openai", return_value=MISSING_CONTACT_JAKES_SNIPPETS)
+    @patch("apps.tailor.services._generate_with_openai", return_value=MISSING_CONTACT_JAKES_SNIPPETS)
     def test_generate_latex_resume_jakes_rejects_unparsable_header(self, openai_mock):
         with self.assertRaisesRegex(RuntimeError, "Could not parse Jake header"):
             services.generate_latex_resume(
@@ -183,7 +183,7 @@ class GeneratorServicesTests(SimpleTestCase):
             )
         openai_mock.assert_called_once()
 
-    @patch("apps.generator.services._generate_with_openai", return_value="[[[HEADER]]]x[[[/HEADER]]]")
+    @patch("apps.tailor.services._generate_with_openai", return_value="[[[HEADER]]]x[[[/HEADER]]]")
     def test_generate_latex_resume_jakes_rejects_invalid_snippet_format(self, openai_mock):
         with self.assertRaisesRegex(RuntimeError, "must include exactly one 'EDUCATION' block"):
             services.generate_latex_resume(
@@ -196,7 +196,7 @@ class GeneratorServicesTests(SimpleTestCase):
             )
         openai_mock.assert_called_once()
 
-    @patch("apps.generator.services._generate_with_openai", return_value=VALID_JAKES_SNIPPETS)
+    @patch("apps.tailor.services._generate_with_openai", return_value=VALID_JAKES_SNIPPETS)
     def test_generate_latex_resume_non_jakes_keeps_existing_flow(self, openai_mock):
         latex = services.generate_latex_resume(
             resume_text="Resume text",
@@ -209,14 +209,14 @@ class GeneratorServicesTests(SimpleTestCase):
         self.assertEqual(latex, VALID_JAKES_SNIPPETS)
         openai_mock.assert_called_once()
 
-    @patch("apps.generator.services._extract_company_position_with_gpt5", return_value=("Acme Inc", "Backend Engineer"))
+    @patch("apps.tailor.services._extract_company_position_with_gpt5", return_value=("Acme Inc", "Backend Engineer"))
     def test_summarize_document_name_uses_gpt5_output(self, gpt5_mock):
         name = services.summarize_document_name("Any job description")
         self.assertEqual(name, "Acme Inc - Backend Engineer")
         gpt5_mock.assert_called_once()
 
     @patch(
-        "apps.generator.services._extract_company_position_with_gpt5",
+        "apps.tailor.services._extract_company_position_with_gpt5",
         return_value=(
             "another term, depending on performance and mutual interest",
             "passionate and well-rounded candidate to join Diligent",
@@ -227,7 +227,7 @@ class GeneratorServicesTests(SimpleTestCase):
         self.assertEqual(name, "Unknown Company - Unknown Position")
         gpt5_mock.assert_called_once()
 
-    @patch("apps.generator.services._extract_company_position_with_gpt5", return_value=("", ""))
+    @patch("apps.tailor.services._extract_company_position_with_gpt5", return_value=("", ""))
     def test_summarize_document_name_falls_back_to_pattern_extraction(self, gpt5_mock):
         name = services.summarize_document_name(
             "Company: Orbit Labs\n"
@@ -237,7 +237,7 @@ class GeneratorServicesTests(SimpleTestCase):
         self.assertEqual(name, "Orbit Labs - Machine Learning Engineer")
         gpt5_mock.assert_called_once()
 
-    @patch("apps.generator.services._extract_company_position_with_gpt5", return_value=("", ""))
+    @patch("apps.tailor.services._extract_company_position_with_gpt5", return_value=("", ""))
     def test_summarize_document_identity_returns_split_parts(self, gpt5_mock):
         company, position, name = services.summarize_document_identity(
             "Company: Diligent\n"

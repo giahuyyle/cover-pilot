@@ -290,10 +290,10 @@ export default function Dashboard() {
                                             asChild
                                             className="h-16 justify-between rounded-lg bg-[#5d681c] px-5 text-base text-white hover:bg-[#4d5818]"
                                         >
-                                            <Link to="/generator">
+                                            <Link to={user ? "/generator" : "/tailor"}>
                                                 <span className="inline-flex items-center gap-3">
                                                     <Plus className="size-5" strokeWidth={1.8} />
-                                                    Create new letter
+                                                    {user ? "Generate resume" : "Tailor resume"}
                                                 </span>
                                                 <ArrowRight className="size-5" strokeWidth={1.8} />
                                             </Link>
@@ -305,9 +305,9 @@ export default function Dashboard() {
                                                 variant="outline"
                                                 className="h-16 flex-col rounded-lg border-[#d9d2c2] bg-white text-[#493b1e] hover:bg-[#f6f2e8]"
                                             >
-                                                <Link to="/generator">
+                                                <Link to="/tailor">
                                                     <Upload className="size-4" strokeWidth={1.8} />
-                                                    Upload resume
+                                                    Tailor PDF
                                                 </Link>
                                             </Button>
                                             <Button
@@ -325,7 +325,7 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="border-t border-[#e6e0d2] pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                                    <SectionHeader title="Resume health" action="Improve" to="/generator" />
+                                    <SectionHeader title="Resume health" action="Improve" to="/tailor" />
                                     <div className="mt-5 flex flex-col gap-6 sm:flex-row sm:items-center">
                                         <ProgressRing value={78} label="Good" />
                                         <div className="min-w-0 flex-1 space-y-3">
@@ -437,7 +437,7 @@ export default function Dashboard() {
                                     ))}
                                 </div>
                                 <Link
-                                    to="/generator"
+                                    to={user ? "/generator" : "/tailor"}
                                     className="flex items-center justify-center gap-2 border-t border-[#e5dfd0] px-5 py-4 text-sm font-medium text-[#4d5818] transition hover:bg-[#faf8f1]"
                                 >
                                     Start next application
@@ -464,7 +464,7 @@ export default function Dashboard() {
                                             size="sm"
                                             className="rounded-md border-[#cfc6b4] bg-white text-[#493b1e] hover:bg-[#f6f2e8]"
                                         >
-                                            <Link to="/generator">Use</Link>
+                                            <Link to="/tailor">Use</Link>
                                         </Button>
                                     </div>
                                 ))}
@@ -556,9 +556,9 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             <Button asChild variant="outline" className="mt-5 w-full rounded-md border-[#b8be92] bg-white text-[#493b1e] hover:bg-[#fbfaf5]">
-                                <Link to="/generator">
+                                <Link to={user ? "/generator" : "/tailor"}>
                                     <FolderOpen className="size-4" strokeWidth={1.8} />
-                                    Open generator
+                                    {user ? "Open generator" : "Open tailor"}
                                 </Link>
                             </Button>
                         </Panel>

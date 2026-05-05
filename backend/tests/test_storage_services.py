@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 
-from apps.generator.storage import USER_DOC_TTL_SECONDS, list_user_documents
+from apps.tailor.storage import USER_DOC_TTL_SECONDS, list_user_documents
 
 
 class _FakeDoc:
@@ -16,8 +16,8 @@ class _FakeDoc:
 
 
 class StorageServicesTests(SimpleTestCase):
-    @patch("apps.generator.storage._s3_client")
-    @patch("apps.generator.storage.firestore.client")
+    @patch("apps.tailor.storage._s3_client")
+    @patch("apps.tailor.storage.firestore.client")
     def test_list_user_documents_handles_active_expired_and_sorts_newest_first(self, firestore_client_mock, s3_client_mock):
         now = datetime.now(timezone.utc)
         created_legacy = now - timedelta(hours=1)
@@ -99,8 +99,8 @@ class StorageServicesTests(SimpleTestCase):
 
         self.assertEqual(s3.generate_presigned_url.call_count, 4)
 
-    @patch("apps.generator.storage._s3_client")
-    @patch("apps.generator.storage.firestore.client")
+    @patch("apps.tailor.storage._s3_client")
+    @patch("apps.tailor.storage.firestore.client")
     def test_list_user_documents_returns_requested_page_slice(self, firestore_client_mock, s3_client_mock):
         now = datetime.now(timezone.utc)
         docs = [
@@ -133,8 +133,8 @@ class StorageServicesTests(SimpleTestCase):
         self.assertTrue(pagination["has_next"])
         self.assertTrue(pagination["has_prev"])
 
-    @patch("apps.generator.storage._s3_client")
-    @patch("apps.generator.storage.firestore.client")
+    @patch("apps.tailor.storage._s3_client")
+    @patch("apps.tailor.storage.firestore.client")
     def test_list_user_documents_normalizes_invalid_and_out_of_range_pagination(self, firestore_client_mock, s3_client_mock):
         now = datetime.now(timezone.utc)
         docs = [
@@ -168,8 +168,8 @@ class StorageServicesTests(SimpleTestCase):
         self.assertEqual(clamped_pagination["total_pages"], 2)
         self.assertFalse(clamped_pagination["has_next"])
 
-    @patch("apps.generator.storage._s3_client")
-    @patch("apps.generator.storage.firestore.client")
+    @patch("apps.tailor.storage._s3_client")
+    @patch("apps.tailor.storage.firestore.client")
     def test_list_user_documents_safely_splits_legacy_hyphen_name(self, firestore_client_mock, s3_client_mock):
         now = datetime.now(timezone.utc)
         docs = [
@@ -195,3 +195,41 @@ class StorageServicesTests(SimpleTestCase):
         self.assertEqual(row["name"], "Orbit Labs - AI Platform Intern")
         self.assertEqual(row["company_name"], "Orbit Labs")
         self.assertEqual(row["position_name"], "AI Platform Intern")
+
+    @patch("apps.tailor.storage._s3_client")
+    @patch("apps.tailor.storage.firestore.client")
+    def test_list_user_documents_uses_stored_download_filename(self, firestore_client_mock, s3_client_mock):
+        now = datetime.now(timezone.utc)
+        docs = [
+            _FakeDoc("doc-1", {
+                "name": "Orbit Labs - Software Engineer",
+                "download_filename": "Software_Engineer_Jane_Candidate_Resume.pdf",
+                "template": "jakes",
+                "s3_key": "users/uid-1/doc-1.pdf",
+                "created_at": now.isoformat(),
+                "expires_at": (now + timedelta(hours=1)).isoformat(),
+            }),
+        ]
+
+        db = MagicMock()
+        firestore_client_mock.return_value = db
+        db.collection.return_value.document.return_value.collection.return_value.stream.return_value = docs
+
+        s3 = MagicMock()
+        s3.generate_presigned_url.side_effect = ["https://example.com/view", "https://example.com/download"]
+        s3_client_mock.return_value = s3
+
+        result = list_user_documents("uid-1")
+        row = result["documents"][0]
+        self.assertEqual(row["download_filename"], "Software_Engineer_Jane_Candidate_Resume.pdf")
+
+        inline_call = s3.generate_presigned_url.call_args_list[0]
+        download_call = s3.generate_presigned_url.call_args_list[1]
+        self.assertEqual(
+            inline_call.kwargs["Params"]["ResponseContentDisposition"],
+            'inline; filename="Software_Engineer_Jane_Candidate_Resume.pdf"',
+        )
+        self.assertEqual(
+            download_call.kwargs["Params"]["ResponseContentDisposition"],
+            'attachment; filename="Software_Engineer_Jane_Candidate_Resume.pdf"',
+        )

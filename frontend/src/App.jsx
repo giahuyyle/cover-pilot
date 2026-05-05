@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import TemplateMarket from "./pages/TemplateMarket";
 import Generator from "./pages/Generator";
+import Tailor from "./pages/Tailor";
 import Storage from "./pages/Storage";
 
 function RequireAuth() {
@@ -35,10 +36,11 @@ function App() {
             <Route element={<RootLayout />}>
                 <Route path="/dashboard/*" element={<Dashboard />} />
                 <Route path="/templates" element={<TemplateMarket />} />
-                <Route path="/generator" element={<Generator />} />
+                <Route path="/tailor" element={<Tailor />} />
 
                 {/* Auth-only routes */}
                 <Route element={<RequireAuth />}>
+                    <Route path="/generator" element={<Generator />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/storage" element={<Storage />} />
                 </Route>

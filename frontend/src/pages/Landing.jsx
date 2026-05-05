@@ -113,11 +113,11 @@ function ProductPreview() {
                     <h2 className="mt-1 text-lg font-semibold text-zinc-950">Application workspace</h2>
                 </div>
                 <Link
-                    to="/generator"
+                    to="/tailor"
                     className="inline-flex items-center gap-2 rounded-md bg-[#5d681c] px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#4d5818]"
                 >
                     <Sparkles className="size-3.5" strokeWidth={1.8} />
-                    Open generator
+                    Open tailor
                 </Link>
             </div>
 
@@ -293,7 +293,7 @@ export default function Landing() {
                             </p>
                             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                                 <Link
-                                    to="/generator"
+                                    to="/tailor"
                                     className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#5d681c] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
                                 >
                                     Start generating
@@ -340,10 +340,10 @@ export default function Landing() {
                             </p>
                         </div>
                         <Link
-                            to="/generator"
+                            to="/tailor"
                             className="inline-flex items-center gap-2 text-sm font-semibold text-[#4d5818] transition hover:text-zinc-950"
                         >
-                            Open generator
+                            Open tailor
                             <ArrowRight className="size-4" strokeWidth={1.8} />
                         </Link>
                     </div>
@@ -471,7 +471,7 @@ export default function Landing() {
                             </div>
                             <div className="flex flex-col gap-3 sm:flex-row">
                                 <Link
-                                    to="/generator"
+                                    to="/tailor"
                                     className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#5d681c] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
                                 >
                                     Start generating
