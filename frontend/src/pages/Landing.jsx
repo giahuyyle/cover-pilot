@@ -1,7 +1,11 @@
+import { useEffect } from "react";
 import {
     ArrowRight,
+    BriefcaseBusiness,
     CheckCircle2,
     ClipboardList,
+    Clock3,
+    Download,
     FileText,
     FolderOpen,
     LayoutTemplate,
@@ -63,15 +67,41 @@ const templateCards = [
 ];
 
 const qualityItems = [
-    "Role-specific language",
-    "Template-safe structure",
-    "Resume health scoring",
-    "Application tracker",
+    { label: "Role-specific language", icon: Target },
+    { label: "Template-safe structure", icon: LayoutTemplate },
+    { label: "Resume health scoring", icon: ShieldCheck },
+    { label: "Application tracker", icon: BriefcaseBusiness },
 ];
 
-function DocumentPreview({ tone = "bg-white", compact = false }) {
+function useScrollReveal() {
+    useEffect(() => {
+        const elements = Array.from(document.querySelectorAll("[data-reveal]"));
+
+        if (!("IntersectionObserver" in window)) {
+            elements.forEach((element) => element.classList.add("is-visible"));
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("is-visible");
+                        observer.unobserve(entry.target);
+                    }
+                });
+            },
+            { rootMargin: "0px 0px -12% 0px", threshold: 0.18 }
+        );
+
+        elements.forEach((element) => observer.observe(element));
+        return () => observer.disconnect();
+    }, []);
+}
+
+function DocumentPreview({ tone = "bg-white", compact = false, tilted = false }) {
     return (
-        <div className={`rounded-lg border border-[#d9d2c3] ${tone} p-4 shadow-sm`}>
+        <div className={`landing-paper ${tilted ? "landing-paper-tilted" : ""} rounded-lg border border-[#d9d2c3] ${tone} p-4 shadow-sm`}>
             <div className="mb-4 flex items-center justify-between">
                 <div className="h-2 w-20 rounded-full bg-zinc-900/80" />
                 <div className="h-2 w-8 rounded-full bg-[#66701f]/80" />
@@ -106,7 +136,8 @@ function DocumentPreview({ tone = "bg-white", compact = false }) {
 
 function ProductPreview() {
     return (
-        <div className="rounded-xl border border-[#d8d1c2] bg-[#fffdf8] p-4 shadow-[0_28px_80px_rgba(45,42,29,0.14)]">
+        <div className="landing-product relative overflow-hidden rounded-xl border border-[#d8d1c2] bg-[#fffdf8] p-4 shadow-[0_28px_80px_rgba(45,42,29,0.16)]">
+            <div className="landing-scan" />
             <div className="mb-4 flex items-center justify-between border-b border-[#e7e0d3] pb-3">
                 <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-[#64701f]">Dashboard</p>
@@ -129,7 +160,7 @@ function ProductPreview() {
                                 <p className="text-sm font-semibold text-zinc-950">Create new letter</p>
                                 <p className="mt-1 text-xs text-zinc-600">Marketing manager at Northwind</p>
                             </div>
-                            <div className="flex size-10 items-center justify-center rounded-md bg-[#5d681c] text-white">
+                            <div className="landing-pulse flex size-10 items-center justify-center rounded-md bg-[#5d681c] text-white">
                                 <PenLine className="size-5" strokeWidth={1.8} />
                             </div>
                         </div>
@@ -179,8 +210,8 @@ function ProductPreview() {
                                     </div>
                                     <div className="h-1.5 rounded-full bg-[#ece7dc]">
                                         <div
-                                            className="h-full rounded-full bg-[#5d681c]"
-                                            style={{ width: `${82 - index * 4}%` }}
+                                            className="landing-progress h-full rounded-full bg-[#5d681c]"
+                                            style={{ width: `${82 - index * 4}%`, animationDelay: `${index * 120}ms` }}
                                         />
                                     </div>
                                 </div>
@@ -211,11 +242,34 @@ function ProductPreview() {
     );
 }
 
+function HeroGraphic() {
+    return (
+        <div className="landing-hero-graphic relative">
+            <div className="landing-route landing-route-one" />
+            <div className="landing-route landing-route-two" />
+            <div className="landing-orbit" />
+            <div className="landing-float-doc landing-float-doc-a">
+                <FileText className="size-4" strokeWidth={1.8} />
+                Resume.pdf
+            </div>
+            <div className="landing-float-doc landing-float-doc-b">
+                <Target className="size-4" strokeWidth={1.8} />
+                Job post
+            </div>
+            <div className="landing-float-doc landing-float-doc-c">
+                <Download className="size-4" strokeWidth={1.8} />
+                Ready packet
+            </div>
+            <ProductPreview />
+        </div>
+    );
+}
+
 function WorkflowCard({ step, index }) {
     const Icon = step.icon;
 
     return (
-        <div className="rounded-lg border border-[#ded7c8] bg-white p-5 shadow-sm">
+        <div className="landing-tilt-card rounded-lg border border-[#ded7c8] bg-white p-5 shadow-sm" data-reveal style={{ transitionDelay: `${index * 90}ms` }}>
             <div className="mb-5 flex items-center justify-between">
                 <div className="flex size-11 items-center justify-center rounded-md bg-[#f3f5e6] text-[#5d681c]">
                     <Icon className="size-5" strokeWidth={1.8} />
@@ -228,10 +282,10 @@ function WorkflowCard({ step, index }) {
     );
 }
 
-function TemplateCard({ template }) {
+function TemplateCard({ template, index }) {
     return (
-        <div className="rounded-lg border border-[#ded7c8] bg-white p-4 shadow-sm">
-            <DocumentPreview tone={template.tone} compact />
+        <div className="landing-template-card rounded-lg border border-[#ded7c8] bg-white p-4 shadow-sm" data-reveal style={{ transitionDelay: `${index * 90}ms` }}>
+            <DocumentPreview tone={template.tone} compact tilted={index === 1} />
             <h3 className="mt-5 text-lg font-semibold text-zinc-950">{template.title}</h3>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{template.description}</p>
             <Link
@@ -246,13 +300,15 @@ function TemplateCard({ template }) {
 }
 
 export default function Landing() {
+    useScrollReveal();
+
     return (
-        <div className="min-h-screen bg-[#fbfaf5] text-zinc-950">
-            <header className="sticky top-0 z-40 border-b border-[#e4dece] bg-[#fbfaf5]/90 backdrop-blur">
+        <div className="landing-shell min-h-screen bg-[#fbfaf5] text-zinc-950">
+            <header className="sticky top-0 z-40 border-b border-[#e4dece] bg-[#fbfaf5]/86 backdrop-blur-xl">
                 <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
                     <Link to="/" className="flex items-center gap-3">
                         <img src="/logo.svg" alt="Cover Pilot" className="size-11 rounded-md" />
-                        <span className="text-lg font-semibold tracking-tight">Cover Pilot</span>
+                        <span className="text-lg font-semibold">Cover Pilot</span>
                     </Link>
 
                     <div className="hidden items-center gap-7 md:flex">
@@ -282,11 +338,13 @@ export default function Landing() {
             </header>
 
             <main>
-                <section className="border-b border-[#e4dece]">
-                    <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[0.88fr_1.12fr] lg:px-8 lg:pb-20 lg:pt-20">
-                        <div className="flex flex-col justify-center">
-                            <h1 className="max-w-3xl text-5xl font-semibold leading-[1.02] tracking-tight text-zinc-950 sm:text-6xl">
-                                Tailored resumes and cover letters without the formatting grind.
+                <section className="landing-hero overflow-hidden border-b border-[#e4dece]">
+                    <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[0.78fr_1.22fr] lg:px-8 lg:pb-20 lg:pt-20">
+                        <div className="flex flex-col justify-center" data-reveal>
+                            <h1 className="landing-display max-w-3xl text-5xl font-semibold leading-[1.02] text-zinc-950 sm:text-6xl">
+                                <span className="landing-heading-gradient">Tailored resumes</span> and{" "}
+                                <span className="landing-heading-copper">cover letters</span> without the{" "}
+                                <span className="landing-heading-teal">formatting grind.</span>
                             </h1>
                             <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-650">
                                 Cover Pilot turns your resume and a job post into a polished application packet, then helps you track readiness across every role.
@@ -294,14 +352,14 @@ export default function Landing() {
                             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                                 <Link
                                     to="/tailor"
-                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#5d681c] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
+                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#5d681c] px-6 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#4d5818]"
                                 >
                                     Start generating
                                     <Sparkles className="size-4" strokeWidth={1.8} />
                                 </Link>
                                 <Link
                                     to="/templates"
-                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-[#cfc7b7] bg-white px-6 text-sm font-semibold text-zinc-800 shadow-sm transition hover:border-[#a8aa78] hover:bg-[#f8f5eb]"
+                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-[#cfc7b7] bg-white px-6 text-sm font-semibold text-zinc-800 shadow-sm transition hover:-translate-y-0.5 hover:border-[#a8aa78] hover:bg-[#f8f5eb]"
                                 >
                                     View templates
                                     <LayoutTemplate className="size-4" strokeWidth={1.8} />
@@ -313,8 +371,8 @@ export default function Landing() {
                                     ["30 sec", "first draft"],
                                     ["5", "template styles"],
                                     ["PDF", "ready output"],
-                                ].map(([value, label]) => (
-                                    <div key={label} className="rounded-lg border border-[#ddd6c8] bg-white p-4">
+                                ].map(([value, label], index) => (
+                                    <div key={label} className="landing-metric rounded-lg border border-[#ddd6c8] bg-white/86 p-4" style={{ animationDelay: `${index * 140}ms` }}>
                                         <p className="text-2xl font-semibold text-zinc-950">{value}</p>
                                         <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
                                     </div>
@@ -322,19 +380,18 @@ export default function Landing() {
                             </div>
                         </div>
 
-                        <div className="relative">
-                            <div className="absolute -inset-4 rounded-[28px] border border-[#ebe4d6] bg-white/45" />
-                            <div className="relative">
-                                <ProductPreview />
-                            </div>
+                        <div className="relative" data-reveal>
+                            <HeroGraphic />
                         </div>
                     </div>
                 </section>
 
-                <section id="workflow" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-                    <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <section id="workflow" className="mx-auto max-w-7xl px-4 py-18 sm:px-6 lg:px-8">
+                    <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end" data-reveal>
                         <div>
-                            <h2 className="text-3xl font-semibold tracking-tight text-zinc-950">From job post to application packet.</h2>
+                            <h2 className="landing-display landing-section-title text-3xl font-semibold text-zinc-950">
+                                From <span>job post</span> to application packet.
+                            </h2>
                             <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-600">
                                 Keep the workflow compact: upload your resume, paste the role, choose a template, and generate a packet you can keep improving.
                             </p>
@@ -348,17 +405,19 @@ export default function Landing() {
                         </Link>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="landing-workflow-grid grid gap-4 md:grid-cols-3">
                         {workflowSteps.map((step, index) => (
                             <WorkflowCard key={step.title} step={step} index={index} />
                         ))}
                     </div>
                 </section>
 
-                <section className="border-y border-[#e4dece] bg-white">
-                    <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8">
-                        <div>
-                            <h2 className="text-3xl font-semibold tracking-tight text-zinc-950">Write with the job in view.</h2>
+                <section className="landing-band border-y border-[#e4dece] bg-white">
+                    <div className="mx-auto grid max-w-7xl gap-10 px-4 py-18 sm:px-6 lg:grid-cols-[0.88fr_1.12fr] lg:px-8">
+                        <div data-reveal>
+                            <h2 className="landing-display landing-section-title text-3xl font-semibold text-zinc-950">
+                                Write with the <span>job in view.</span>
+                            </h2>
                             <p className="mt-4 text-base leading-7 text-zinc-600">
                                 Cover Pilot keeps the resume, job requirements, model choice, and generated output in one focused workspace.
                             </p>
@@ -379,8 +438,8 @@ export default function Landing() {
                             </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="rounded-lg border border-[#ded7c8] bg-[#fbfaf5] p-5">
+                        <div className="landing-match-stage grid gap-4 md:grid-cols-2" data-reveal>
+                            <div className="landing-match-card rounded-lg border border-[#ded7c8] bg-[#fbfaf5] p-5">
                                 <div className="mb-5 flex items-center gap-3">
                                     <div className="flex size-10 items-center justify-center rounded-md bg-[#f1e1bf] text-[#8a5c1f]">
                                         <Target className="size-5" strokeWidth={1.8} />
@@ -391,8 +450,8 @@ export default function Landing() {
                                     </div>
                                 </div>
                                 <div className="space-y-3">
-                                    {["Leadership", "Roadmaps", "Stakeholders", "Metrics"].map((item) => (
-                                        <div key={item} className="flex items-center justify-between rounded-md border border-[#e3dcca] bg-white px-3 py-2 text-sm">
+                                    {["Leadership", "Roadmaps", "Stakeholders", "Metrics"].map((item, index) => (
+                                        <div key={item} className="landing-match-row flex items-center justify-between rounded-md border border-[#e3dcca] bg-white px-3 py-2 text-sm" style={{ animationDelay: `${index * 120}ms` }}>
                                             <span>{item}</span>
                                             <span className="text-[#5d681c]">Matched</span>
                                         </div>
@@ -400,7 +459,7 @@ export default function Landing() {
                                 </div>
                             </div>
 
-                            <div className="rounded-lg border border-[#ded7c8] bg-[#f4f6e8] p-5">
+                            <div className="landing-match-card rounded-lg border border-[#ded7c8] bg-[#f4f6e8] p-5">
                                 <div className="mb-5 flex items-center gap-3">
                                     <div className="flex size-10 items-center justify-center rounded-md bg-white text-[#5d681c]">
                                         <FileText className="size-5" strokeWidth={1.8} />
@@ -416,10 +475,12 @@ export default function Landing() {
                     </div>
                 </section>
 
-                <section id="templates" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-                    <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <section id="templates" className="mx-auto max-w-7xl px-4 py-18 sm:px-6 lg:px-8">
+                    <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end" data-reveal>
                         <div>
-                            <h2 className="text-3xl font-semibold tracking-tight text-zinc-950">Template market without the rebuild.</h2>
+                            <h2 className="landing-display landing-section-title text-3xl font-semibold text-zinc-950">
+                                Template market <span>without the rebuild.</span>
+                            </h2>
                             <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-600">
                                 Pick a professional structure first or swap the look after generation while preserving the substance of your packet.
                             </p>
@@ -434,37 +495,45 @@ export default function Landing() {
                     </div>
 
                     <div className="grid gap-5 md:grid-cols-3">
-                        {templateCards.map((template) => (
-                            <TemplateCard key={template.title} template={template} />
+                        {templateCards.map((template, index) => (
+                            <TemplateCard key={template.title} template={template} index={index} />
                         ))}
                     </div>
                 </section>
 
-                <section id="quality" className="border-y border-[#e4dece] bg-[#1f2613] text-white">
-                    <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-                        <div>
+                <section id="quality" className="landing-quality overflow-hidden border-y border-[#e4dece] bg-[#1f2613] text-white">
+                    <div className="mx-auto grid max-w-7xl gap-10 px-4 py-18 sm:px-6 lg:grid-cols-[0.86fr_1.14fr] lg:px-8">
+                        <div data-reveal>
                             <ShieldCheck className="size-10 text-[#d6efa3]" strokeWidth={1.7} />
-                            <h2 className="mt-6 text-3xl font-semibold tracking-tight">Built for careful applications, not one-off text dumps.</h2>
+                            <h2 className="landing-display mt-6 text-3xl font-semibold">
+                                Built for <span className="landing-dark-highlight">careful applications</span>, not one-off text dumps.
+                            </h2>
                             <p className="mt-4 text-base leading-7 text-zinc-300">
                                 The dashboard gives every generated document context: target role, readiness, template, and follow-up status.
                             </p>
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            {qualityItems.map((item) => (
-                                <div key={item} className="rounded-lg border border-white/12 bg-white/8 p-5">
-                                    <CheckCircle2 className="size-5 text-[#d6efa3]" strokeWidth={1.8} />
-                                    <p className="mt-4 font-semibold">{item}</p>
-                                </div>
-                            ))}
+                        <div className="landing-quality-grid grid gap-3 sm:grid-cols-2" data-reveal>
+                            {qualityItems.map((item, index) => {
+                                const Icon = item.icon;
+
+                                return (
+                                    <div key={item.label} className="landing-quality-card rounded-lg border border-white/12 bg-white/8 p-5" style={{ transitionDelay: `${index * 90}ms` }}>
+                                        <Icon className="size-5 text-[#d6efa3]" strokeWidth={1.8} />
+                                        <p className="mt-4 font-semibold">{item.label}</p>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </section>
 
-                <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-                    <div className="rounded-xl border border-[#d8d1c2] bg-[#fffdf8] p-8 shadow-[0_24px_70px_rgba(45,42,29,0.08)] md:p-10">
+                <section className="mx-auto max-w-7xl px-4 py-18 sm:px-6 lg:px-8">
+                    <div className="landing-cta rounded-xl border border-[#d8d1c2] bg-[#fffdf8] p-8 shadow-[0_24px_70px_rgba(45,42,29,0.08)] md:p-10" data-reveal>
                         <div className="flex flex-col justify-between gap-8 md:flex-row md:items-center">
                             <div>
-                                <h2 className="text-3xl font-semibold tracking-tight text-zinc-950">Start with one role. Leave with a stronger packet.</h2>
+                                <h2 className="landing-display landing-section-title text-3xl font-semibold text-zinc-950">
+                                    Start with one role. Leave with a <span>stronger packet.</span>
+                                </h2>
                                 <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-600">
                                     Generate a tailored draft, try a template, and bring the same workspace into your next application.
                                 </p>
@@ -472,14 +541,14 @@ export default function Landing() {
                             <div className="flex flex-col gap-3 sm:flex-row">
                                 <Link
                                     to="/tailor"
-                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#5d681c] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
+                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#5d681c] px-6 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#4d5818]"
                                 >
                                     Start generating
                                     <Send className="size-4" strokeWidth={1.8} />
                                 </Link>
                                 <Link
                                     to="/dashboard"
-                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-[#cfc7b7] bg-white px-6 text-sm font-semibold text-zinc-800 shadow-sm transition hover:border-[#a8aa78] hover:bg-[#f8f5eb]"
+                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-[#cfc7b7] bg-white px-6 text-sm font-semibold text-zinc-800 shadow-sm transition hover:-translate-y-0.5 hover:border-[#a8aa78] hover:bg-[#f8f5eb]"
                                 >
                                     Open dashboard
                                     <FolderOpen className="size-4" strokeWidth={1.8} />
@@ -494,7 +563,7 @@ export default function Landing() {
                 <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
                     <Link to="/" className="flex items-center gap-3">
                         <img src="/logo.svg" alt="Cover Pilot" className="size-10 rounded-md" />
-                        <span className="font-semibold tracking-tight">Cover Pilot</span>
+                        <span className="font-semibold">Cover Pilot</span>
                     </Link>
                     <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-600">
                         <a href="mailto:cover.pilot@gmail.com" className="hover:text-zinc-950">Contact</a>
