@@ -478,7 +478,7 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_42%,#f7f5ec_100%)]">
+        <div className="bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_42%,#f7f5ec_100%)] dark:bg-[linear-gradient(180deg,#11130c_0%,#17180f_46%,#10110b_100%)]">
             <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
                 <div className="mb-5 flex flex-col gap-4 border-b border-[#e3dece] pb-5 sm:flex-row sm:items-center sm:justify-between">
                     <div>

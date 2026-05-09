@@ -19,6 +19,7 @@ import { auth } from "@/lib/firebase";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const loginFields = [
     {
@@ -259,17 +260,20 @@ export default function AuthLayout({ isLogin = true }) {
     };
 
     return (
-        <div className="min-h-screen bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_48%,#f4f1e8_100%)] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_48%,#f4f1e8_100%)] px-4 py-6 dark:bg-[linear-gradient(180deg,#11130c_0%,#17180f_48%,#10110b_100%)] sm:px-6 lg:px-8">
             <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center">
                 <div className="grid w-full overflow-hidden rounded-2xl border border-[#ded7c8] bg-[#fffdf8] shadow-[0_28px_90px_rgba(45,42,29,0.12)] lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)]">
                     <section className="px-5 py-6 sm:px-8 lg:px-10">
-                        <Link to="/" className="flex w-fit items-center gap-3">
-                            <img src="/logo.svg" alt="Cover Pilot" className="size-11 rounded-md" />
-                            <div>
-                                <p className="font-semibold tracking-tight text-zinc-950">Cover Pilot</p>
-                                <p className="text-xs font-medium text-[#5d681c]">Application workspace</p>
-                            </div>
-                        </Link>
+                        <div className="flex items-center justify-between gap-4">
+                            <Link to="/" className="flex w-fit items-center gap-3">
+                                <img src="/logo.svg" alt="Cover Pilot" className="size-11 rounded-md" />
+                                <div>
+                                    <p className="font-semibold tracking-tight text-zinc-950">Cover Pilot</p>
+                                    <p className="text-xs font-medium text-[#5d681c]">Application workspace</p>
+                                </div>
+                            </Link>
+                            <ThemeToggle className="size-10" />
+                        </div>
 
                         <div className="mt-10 max-w-2xl">
                             <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">

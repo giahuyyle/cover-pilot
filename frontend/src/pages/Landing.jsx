@@ -17,6 +17,7 @@ import {
     Upload,
 } from "lucide-react";
 import { Link } from "react-router";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const navItems = [
     { label: "Workflow", href: "#workflow" },
@@ -320,6 +321,7 @@ export default function Landing() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <ThemeToggle className="size-10" />
                         <Link
                             to="/login"
                             className="hidden rounded-md px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-white hover:text-zinc-950 sm:inline-flex"

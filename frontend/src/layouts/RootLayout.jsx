@@ -36,7 +36,7 @@ export default function RootLayout() {
     };
 
     return (
-        <div className="min-h-screen bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_42%,#f7f5ec_100%)]">
+        <div className="min-h-screen bg-[linear-gradient(180deg,#fbfaf5_0%,#ffffff_42%,#f7f5ec_100%)] dark:bg-[linear-gradient(180deg,#11130c_0%,#17180f_48%,#10110b_100%)]">
             <Navbar />
 
             {/* Outlet is to render the children element */}
