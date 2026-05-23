@@ -102,4 +102,4 @@ class GenerateProfileResumeApiTests(SimpleTestCase):
 
         response = self.view(request, provider="openai", model="gpt-5.4-mini")
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)

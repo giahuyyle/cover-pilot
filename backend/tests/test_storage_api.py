@@ -57,4 +57,4 @@ class StorageListApiTests(SimpleTestCase):
         request = self.factory.get("/api/users/storage/")
         response = self.view(request)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)

@@ -1,10 +1,18 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+from apps.users.resume_parser import (
+    ResumeParseError,
+    extract_resume_text,
+    merge_parsed_profile,
+    parse_resume_into_profile,
+)
 from apps.users.services import get_user_profile, update_user_profile
-from apps.users.views import ProfileView
+from apps.users.views import ProfileView, ResumeParseView
 
 
 class ProfileApiTests(SimpleTestCase):
@@ -67,7 +75,81 @@ class ProfileApiTests(SimpleTestCase):
         request = self.factory.get("/api/users/me/")
         response = self.view(request)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
+
+
+class ResumeParseApiTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.view = ResumeParseView.as_view()
+
+    def _build_request(self, payload=None):
+        pdf = SimpleUploadedFile("resume.pdf", b"%PDF-1.4 test", content_type="application/pdf")
+        return self.factory.post(
+            "/api/users/me/parse-resume/",
+            payload or {"resume": pdf},
+            format="multipart",
+        )
+
+    @patch("apps.users.views.parse_resume_into_profile")
+    @patch("apps.users.views.get_user_profile")
+    def test_parse_resume_returns_review_payload_without_saving(self, get_profile_mock, parse_mock):
+        get_profile_mock.return_value = {"uid": "uid-1", "email": "user@example.com", "basic": {}}
+        parse_mock.return_value = {
+            "parsed_profile": {"full_name": "Taylor Avery"},
+            "merged_profile": {"full_name": "Taylor Avery"},
+            "suggestions": [],
+            "matches": [],
+            "warnings": [],
+        }
+        request = self._build_request()
+        force_authenticate(request, user={"uid": "uid-1", "email": "user@example.com"})
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["merged_profile"]["full_name"], "Taylor Avery")
+        get_profile_mock.assert_called_once_with("uid-1")
+        parse_mock.assert_called_once()
+
+    def test_parse_resume_requires_authentication(self):
+        request = self._build_request()
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 401)
+
+    @patch("apps.users.views.parse_resume_into_profile")
+    def test_parse_resume_requires_file(self, parse_mock):
+        request = self.factory.post("/api/users/me/parse-resume/", {}, format="multipart")
+        force_authenticate(request, user={"uid": "uid-1"})
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 400)
+        parse_mock.assert_not_called()
+
+    @patch("apps.users.views.parse_resume_into_profile")
+    def test_parse_resume_rejects_invalid_provider_model(self, parse_mock):
+        request = self._build_request({"resume": SimpleUploadedFile("resume.pdf", b"x"), "provider": "openai", "model": "bad"})
+        force_authenticate(request, user={"uid": "uid-1"})
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 400)
+        parse_mock.assert_not_called()
+
+    @patch("apps.users.views.get_user_profile", return_value={"uid": "uid-1"})
+    @patch("apps.users.views.parse_resume_into_profile", side_effect=ResumeParseError("Resume must be a PDF or DOCX file."))
+    def test_parse_resume_returns_validation_error(self, parse_mock, get_profile_mock):
+        request = self._build_request({"resume": SimpleUploadedFile("resume.txt", b"text", content_type="text/plain")})
+        force_authenticate(request, user={"uid": "uid-1"})
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "Resume must be a PDF or DOCX file.")
+        get_profile_mock.assert_called_once_with("uid-1")
+        parse_mock.assert_called_once()
 
 
 class UserServiceTests(SimpleTestCase):
@@ -233,3 +315,134 @@ class UserServiceTests(SimpleTestCase):
         self.assertEqual(result["education"], [])
         self.assertEqual(result["certificates"], [])
         self.assertEqual(result["skills"], [])
+
+
+class ResumeParserServiceTests(SimpleTestCase):
+    def test_merge_replaces_bullets_for_matching_experience_and_projects(self):
+        existing = {
+            "uid": "uid-1",
+            "email": "user@example.com",
+            "full_name": "Taylor Avery",
+            "basic": {"phone_country_code": "+1", "phone": "", "location": "Edmonton"},
+            "experience": [
+                {
+                    "company": "Acme",
+                    "role": "Developer",
+                    "location": "",
+                    "start_date": "",
+                    "end_date": "",
+                    "is_current": False,
+                    "description": ["Old bullet"],
+                }
+            ],
+            "projects": [
+                {
+                    "name": "Cover Pilot",
+                    "label": "",
+                    "stack": ["React"],
+                    "description": ["Old project bullet"],
+                    "live_url": "",
+                    "github_url": "",
+                    "start_date": "",
+                    "end_date": "",
+                }
+            ],
+        }
+        parsed = {
+            "full_name": "Taylor A.",
+            "basic": {"phone": "555-0100", "location": "Calgary"},
+            "experience": [
+                {
+                    "company": "Acme",
+                    "role": "Developer",
+                    "location": "Remote",
+                    "description": ["Built APIs", "Improved latency"],
+                },
+                {
+                    "company": "Orbit",
+                    "role": "Engineer",
+                    "description": ["Built dashboards"],
+                },
+            ],
+            "projects": [
+                {
+                    "name": "Cover Pilot",
+                    "stack": ["React", "Django"],
+                    "description": ["Generated resumes"],
+                },
+                {
+                    "name": "New Project",
+                    "description": ["Launched feature"],
+                },
+            ],
+        }
+
+        merged, suggestions, matches = merge_parsed_profile(existing, parsed)
+
+        self.assertEqual(merged["basic"]["phone"], "555-0100")
+        self.assertEqual(merged["basic"]["location"], "Edmonton")
+        self.assertEqual(suggestions[0]["field"], "full_name")
+        self.assertEqual(suggestions[1]["field"], "location")
+        self.assertEqual(merged["experience"][0]["description"], ["Built APIs", "Improved latency"])
+        self.assertEqual(merged["experience"][0]["location"], "Remote")
+        self.assertEqual(merged["experience"][1]["company"], "Orbit")
+        self.assertEqual(merged["projects"][0]["description"], ["Generated resumes"])
+        self.assertEqual(merged["projects"][0]["stack"], ["React", "Django"])
+        self.assertEqual(merged["projects"][1]["name"], "New Project")
+        self.assertIn({"section": "experience", "action": "updated", "key": "developer|acme"}, matches)
+        self.assertIn({"section": "projects", "action": "added", "key": "new project"}, matches)
+
+    @patch("apps.users.resume_parser.extract_pdf_text", return_value="Resume text")
+    def test_extract_resume_text_supports_pdf(self, extract_pdf_mock):
+        uploaded = SimpleUploadedFile("resume.pdf", b"%PDF-1.4", content_type="application/pdf")
+
+        self.assertEqual(extract_resume_text(uploaded), "Resume text")
+        extract_pdf_mock.assert_called_once()
+
+    @patch.dict("sys.modules", {
+        "docx": SimpleNamespace(
+            Document=lambda _: SimpleNamespace(
+                paragraphs=[SimpleNamespace(text="Taylor Avery"), SimpleNamespace(text="")],
+                tables=[
+                    SimpleNamespace(
+                        rows=[
+                            SimpleNamespace(
+                                cells=[SimpleNamespace(text="Skill"), SimpleNamespace(text="Python")]
+                            )
+                        ]
+                    )
+                ],
+            )
+        )
+    })
+    def test_extract_resume_text_supports_docx(self):
+        uploaded = SimpleUploadedFile(
+            "resume.docx",
+            b"docx bytes",
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+        self.assertEqual(extract_resume_text(uploaded), "Taylor Avery\nSkill | Python")
+
+    def test_extract_resume_text_rejects_unsupported_file(self):
+        uploaded = SimpleUploadedFile("resume.txt", b"text", content_type="text/plain")
+
+        with self.assertRaises(ResumeParseError):
+            extract_resume_text(uploaded)
+
+    @patch("apps.users.resume_parser.extract_resume_text", return_value="Resume text")
+    @patch(
+        "apps.users.resume_parser._generate_with_openai",
+        return_value='{"full_name":" Taylor Avery ","ignored":"nope","skills":[{"name":" Python ","category":" Backend "}]}',
+    )
+    def test_parse_resume_into_profile_normalizes_llm_json(self, generate_mock, extract_mock):
+        uploaded = SimpleUploadedFile("resume.pdf", b"%PDF-1.4", content_type="application/pdf")
+
+        payload = parse_resume_into_profile(uploaded, {"uid": "uid-1", "email": "user@example.com"}, "openai", "gpt-5.4-mini")
+
+        self.assertEqual(payload["parsed_profile"]["full_name"], "Taylor Avery")
+        self.assertEqual(payload["parsed_profile"]["skills"], [{"name": "Python", "category": "Backend"}])
+        self.assertNotIn("ignored", payload["parsed_profile"])
+        self.assertEqual(payload["merged_profile"]["skills"], [{"name": "Python", "category": "Backend"}])
+        extract_mock.assert_called_once_with(uploaded)
+        generate_mock.assert_called_once()

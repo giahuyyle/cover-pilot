@@ -10,6 +10,9 @@ initialize_firebase()
 class FirebaseAuthentication(BaseAuthentication):
     """DRF authentication class that verifies Firebase ID tokens."""
 
+    def authenticate_header(self, request):
+        return "Bearer"
+
     def authenticate(self, request):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
     Award,
@@ -6,9 +6,11 @@ import {
     BriefcaseBusiness,
     CheckCircle2,
     Circle,
+    FileSearch,
     Github,
     GraduationCap,
     Link as LinkIcon,
+    Loader2,
     Mail,
     MapPin,
     Minus,
@@ -18,17 +20,23 @@ import {
     ShieldCheck,
     Sparkles,
     Trash2,
+    Upload,
     UserRound,
+    X,
 } from "lucide-react";
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiUpload } from "@/lib/api";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 const PROFILE_ACCENT = "#5d681c";
+const MAX_RESUME_BYTES = 10 * 1024 * 1024;
+const PDF_MIME_TYPE = "application/pdf";
+const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const RESUME_FILE_ACCEPT = ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PROJECT_LABELS = [
     "Full-stack web application",
     "Frontend",
@@ -273,6 +281,38 @@ function getPhoneNumberHint(countryCode) {
     return PHONE_NUMBER_HINTS[countryCode] || "Enter the local number without the country code.";
 }
 
+function isResumeImportFile(file) {
+    const name = file?.name?.toLowerCase() || "";
+    return file?.type === PDF_MIME_TYPE || file?.type === DOCX_MIME_TYPE || name.endsWith(".pdf") || name.endsWith(".docx");
+}
+
+function validateResumeImportFile(file) {
+    if (!file) {
+        return "Please upload your resume as a PDF or DOCX file.";
+    }
+    if (!isResumeImportFile(file)) {
+        return "Resume must be a PDF or DOCX file.";
+    }
+    if (file.size > MAX_RESUME_BYTES) {
+        return "Resume file must be 10MB or smaller.";
+    }
+    return "";
+}
+
+function isProfileMeaningfullyEmpty(formData) {
+    const basicValues = Object.entries(formData.basic || {})
+        .filter(([key]) => key !== "phone_country_code")
+        .map(([, value]) => value);
+    const hasBasic = basicValues.some(hasText);
+    const hasExperience = formData.experience.some((item) => hasText(item.company) || hasText(item.role) || hasListItem(item.description));
+    const hasProjects = formData.projects.some((item) => hasText(item.name) || hasListItem(item.stack) || hasListItem(item.description));
+    const hasEducation = formData.education.some((item) => hasText(item.school) || hasText(item.degree) || hasText(item.major));
+    const hasCertificates = formData.certificates.some((item) => hasText(item.name) || hasText(item.issuer));
+    const hasSkills = formData.skills.some((item) => hasText(item.name));
+
+    return !hasBasic && !hasExperience && !hasProjects && !hasEducation && !hasCertificates && !hasSkills;
+}
+
 function calculateChecklist(formData, fallbackEmail) {
     const basicsComplete = Boolean(
         hasText(formData.fullName) &&
@@ -296,9 +336,9 @@ function calculateChecklist(formData, fallbackEmail) {
     ];
 }
 
-function Panel({ children, className = "" }) {
+function Panel({ children, className = "", panelRef = null }) {
     return (
-        <section className={`rounded-xl border border-[#ded7c8] bg-[#fffdf8] shadow-[0_18px_55px_rgba(32,31,22,0.06)] ${className}`}>
+        <section ref={panelRef} className={`rounded-xl border border-[#ded7c8] bg-[#fffdf8] shadow-[0_18px_55px_rgba(32,31,22,0.06)] ${className}`}>
             {children}
         </section>
     );
@@ -417,12 +457,21 @@ function Chip({ children, onRemove }) {
 
 export default function Profile() {
     const [user, loading] = useAuthState(auth);
+    const parserPanelRef = useRef(null);
+    const basicsPanelRef = useRef(null);
+    const resumeInputRef = useRef(null);
     const [backendProfile, setBackendProfile] = useState(null);
     const [backendLoading, setBackendLoading] = useState(false);
     const [backendError, setBackendError] = useState("");
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSaveError, setProfileSaveError] = useState("");
     const [profileSaveSuccess, setProfileSaveSuccess] = useState("");
+    const [emptyPromptDismissed, setEmptyPromptDismissed] = useState(false);
+    const [resumeFile, setResumeFile] = useState(null);
+    const [resumeInputKey, setResumeInputKey] = useState(0);
+    const [resumeParseLoading, setResumeParseLoading] = useState(false);
+    const [resumeParseError, setResumeParseError] = useState("");
+    const [resumeParseResult, setResumeParseResult] = useState(null);
     const [formData, setFormData] = useState(() => normalizeFormProfile({}, user));
     const [skillInput, setSkillInput] = useState("");
     const [skillCategoryInput, setSkillCategoryInput] = useState("");
@@ -447,6 +496,13 @@ export default function Profile() {
     const requiredChecklist = checklist.filter((item) => item.required);
     const requiredComplete = requiredChecklist.filter((item) => item.complete).length;
     const completionPercent = Math.round((requiredComplete / requiredChecklist.length) * 100);
+    const showEmptyProfilePrompt = Boolean(
+        user &&
+        backendProfile &&
+        !backendLoading &&
+        !emptyPromptDismissed &&
+        isProfileMeaningfullyEmpty(formData)
+    );
 
     const updateField = (field, value) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -631,6 +687,72 @@ export default function Profile() {
         }
     };
 
+    const scrollToParser = () => {
+        parserPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.setTimeout(() => {
+            resumeInputRef.current?.click();
+        }, 250);
+    };
+
+    const scrollToBasics = () => {
+        basicsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.setTimeout(() => {
+            document.getElementById("profile-full-name")?.focus();
+        }, 250);
+    };
+
+    const handleResumeFileChange = (event) => {
+        const selectedFile = event.target.files?.[0] || null;
+        const fileError = validateResumeImportFile(selectedFile);
+
+        if (fileError) {
+            setResumeFile(null);
+            setResumeInputKey((prev) => prev + 1);
+            setResumeParseError(fileError);
+            return;
+        }
+
+        setResumeFile(selectedFile);
+        setResumeParseError("");
+        setResumeParseResult(null);
+    };
+
+    const handleRemoveResumeFile = () => {
+        setResumeFile(null);
+        setResumeParseError("");
+        setResumeParseResult(null);
+        setResumeInputKey((prev) => prev + 1);
+    };
+
+    const handleResumeParse = async () => {
+        const fileError = validateResumeImportFile(resumeFile);
+        if (fileError) {
+            setResumeParseError(fileError);
+            return;
+        }
+
+        setResumeParseLoading(true);
+        setResumeParseError("");
+        setResumeParseResult(null);
+        setProfileSaveSuccess("");
+
+        const form = new FormData();
+        form.append("resume", resumeFile);
+
+        try {
+            const payload = await apiUpload("/api/users/me/parse-resume/", form);
+            const mergedProfile = payload?.merged_profile || {};
+            setFormData(normalizeFormProfile(mergedProfile, user));
+            setResumeParseResult(payload);
+            setEmptyPromptDismissed(true);
+            setProfileSaveSuccess("Resume parsed. Review the imported fields, then save your profile.");
+        } catch (error) {
+            setResumeParseError(error.message || "Failed to parse resume.");
+        } finally {
+            setResumeParseLoading(false);
+        }
+    };
+
     const onChangePassword = async (data) => {
         setPwError(null);
         setPwSuccess(null);
@@ -695,9 +817,163 @@ export default function Profile() {
                 </Panel>
             </header>
 
+            {showEmptyProfilePrompt && (
+                <section className="mb-6 overflow-hidden rounded-xl border border-[#cbd3ad] bg-[#f4f6e8] shadow-[0_18px_55px_rgba(32,31,22,0.06)]">
+                    <div className="flex flex-col gap-5 p-5 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-start gap-4">
+                            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-white text-[#5d681c] shadow-sm">
+                                <FileSearch className="size-5" strokeWidth={1.8} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#687228]">Start your profile</p>
+                                <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-950">Import your resume to fill this in faster</h2>
+                                <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-700">
+                                    Upload a PDF or DOCX resume and review the parsed profile before saving. Existing profile fields stay under your control.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                            <Button
+                                type="button"
+                                onClick={scrollToParser}
+                                className="rounded-md bg-[#5d681c] text-white hover:bg-[#4d5818]"
+                            >
+                                <Upload className="size-4" strokeWidth={1.8} />
+                                Parse resume
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={scrollToBasics}
+                                className="rounded-md border-[#cfc7b7] bg-white text-zinc-800 hover:bg-[#fffdf8]"
+                            >
+                                Fill manually
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Dismiss empty profile prompt"
+                                onClick={() => setEmptyPromptDismissed(true)}
+                                className="text-zinc-500 hover:bg-white/70 hover:text-zinc-900"
+                            >
+                                <X className="size-4" strokeWidth={1.8} />
+                            </Button>
+                        </div>
+                    </div>
+                </section>
+            )}
+
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="space-y-6">
-                    <Panel className="p-5 lg:p-6">
+                    <Panel panelRef={parserPanelRef} className="p-5 lg:p-6">
+                        <SectionHeader
+                            title="Resume parser"
+                            description="Import a PDF or DOCX resume into an editable profile draft."
+                            icon={FileSearch}
+                        />
+
+                        <div className="space-y-4">
+                            <input
+                                key={resumeInputKey}
+                                ref={resumeInputRef}
+                                id="profile-resume-parser-upload"
+                                type="file"
+                                accept={RESUME_FILE_ACCEPT}
+                                onChange={handleResumeFileChange}
+                                className="sr-only"
+                            />
+                            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-[#cfc7b7] bg-[#faf8f1] p-4">
+                                <label
+                                    htmlFor="profile-resume-parser-upload"
+                                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md bg-[#5d681c] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4d5818]"
+                                >
+                                    <Upload className="size-4" strokeWidth={1.8} />
+                                    Choose resume
+                                </label>
+                                <p className="min-w-0 flex-1 truncate text-sm text-zinc-600">
+                                    {resumeFile ? resumeFile.name : "PDF or DOCX, up to 10MB"}
+                                </p>
+                                {resumeFile && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-md border-[#cfc7b7] bg-white"
+                                        onClick={handleRemoveResumeFile}
+                                    >
+                                        <X className="size-4" strokeWidth={1.8} />
+                                        Remove
+                                    </Button>
+                                )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Button
+                                    type="button"
+                                    onClick={handleResumeParse}
+                                    disabled={resumeParseLoading || !resumeFile}
+                                    className="rounded-md bg-[#5d681c] text-white hover:bg-[#4d5818]"
+                                >
+                                    {resumeParseLoading ? (
+                                        <>
+                                            <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
+                                            Parsing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FileSearch className="size-4" strokeWidth={1.8} />
+                                            Parse into profile
+                                        </>
+                                    )}
+                                </Button>
+                                <p className="text-sm leading-6 text-zinc-600">
+                                    Parsed data updates this form only. Save after reviewing.
+                                </p>
+                            </div>
+
+                            {resumeParseError && (
+                                <p className="whitespace-pre-wrap rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                    {resumeParseError}
+                                </p>
+                            )}
+
+                            {resumeParseResult && (
+                                <div className="grid gap-3 rounded-lg border border-[#cbd3ad] bg-[#f4f6e8] p-4 text-sm text-zinc-700 md:grid-cols-3">
+                                    <div>
+                                        <p className="font-semibold text-zinc-950">Matched entries</p>
+                                        <p className="mt-1">
+                                            {resumeParseResult.matches?.filter((item) => item.action === "updated").length || 0} updated
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-zinc-950">New entries</p>
+                                        <p className="mt-1">
+                                            {resumeParseResult.matches?.filter((item) => item.action === "added").length || 0} added
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-zinc-950">Suggestions</p>
+                                        <p className="mt-1">
+                                            {resumeParseResult.suggestions?.length || 0} conflicts kept unchanged
+                                        </p>
+                                    </div>
+                                    {resumeParseResult.warnings?.length > 0 && (
+                                        <div className="md:col-span-3">
+                                            <p className="font-semibold text-zinc-950">Review notes</p>
+                                            <ul className="mt-1 list-disc space-y-1 pl-5">
+                                                {resumeParseResult.warnings.map((warning) => (
+                                                    <li key={warning}>{warning}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </Panel>
+
+                    <Panel panelRef={basicsPanelRef} className="p-5 lg:p-6">
                         <SectionHeader
                             title="Basics"
                             description="Primary contact details and professional summary."
@@ -718,6 +994,7 @@ export default function Profile() {
                         <div className="grid gap-5 md:grid-cols-2">
                             <Field label="Full Name">
                                 <Input
+                                    id="profile-full-name"
                                     placeholder="Taylor Avery"
                                     value={formData.fullName}
                                     onChange={(event) => updateField("fullName", event.target.value)}
