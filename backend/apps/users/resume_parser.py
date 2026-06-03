@@ -20,6 +20,9 @@ DOCX_CONTENT_TYPES = {
 }
 PDF_EXTENSIONS = (".pdf",)
 DOCX_EXTENSIONS = (".docx",)
+PROFILE_REVIEW_SECTIONS = ("experience", "projects", "education", "certificates", "skills")
+DUPLICATE_REVIEW_ACTIONS = {"keep_existing", "use_parsed", "merge"}
+NEW_REVIEW_ACTIONS = {"add", "skip"}
 
 PROFILE_PARSER_SYSTEM_PROMPT = (
     "You are a resume parser. Extract truthful candidate profile data from resume text. "
@@ -110,6 +113,49 @@ JSON schema:
 
 Resume text:
 %%RESUME_TEXT%%
+""".strip()
+
+PROFILE_REVIEW_SYSTEM_PROMPT = (
+    "You compare parsed resume profile entries with an existing candidate profile. "
+    "Return only strict JSON with no markdown, comments, or code fences."
+)
+
+PROFILE_REVIEW_USER_PROMPT = """
+Compare every parsed profile entry against the existing profile entries.
+
+Rules:
+- Return strict JSON only.
+- Review all parsed entries in these sections: experience, projects, education, certificates, skills.
+- For each parsed entry, return exactly one review item.
+- Use status "duplicate" when the parsed entry appears to describe the same real-world item as an existing entry, even if titles, names, dates, stacks, or bullet points differ.
+- Use status "new" only when no existing entry describes the same real-world item.
+- For duplicate items, include existing_index and recommend one of: keep_existing, use_parsed, merge.
+- For new items, set existing_index to null and recommend one of: add, skip.
+- Prefer "merge" for duplicates when both entries contain useful non-conflicting details or different bullets.
+- Prefer "use_parsed" when the parsed resume entry appears more complete and current.
+- Prefer "add" for new entries unless the parsed entry is too empty to be useful.
+- Confidence is a number from 0 to 1.
+
+Return this JSON shape:
+{
+  "review_items": [
+    {
+      "section": "experience",
+      "status": "duplicate",
+      "existing_index": 0,
+      "parsed_index": 0,
+      "confidence": 0.92,
+      "reason": "Same company and similar role; parsed bullets differ.",
+      "recommended_action": "merge"
+    }
+  ]
+}
+
+Existing profile sections:
+%%EXISTING_PROFILE%%
+
+Parsed profile sections:
+%%PARSED_PROFILE%%
 """.strip()
 
 
@@ -238,6 +284,134 @@ def _generate_profile_json(resume_text: str, provider: str, model: str) -> dict:
     return _normalize_parsed_profile(parsed)
 
 
+def _profile_sections_for_review(profile: dict) -> dict:
+    normalized = _normalize_parsed_profile(profile)
+    return {section: normalized.get(section, []) for section in PROFILE_REVIEW_SECTIONS}
+
+
+def _generate_text(provider: str, model: str, prompt: str, system_prompt: str) -> str:
+    if provider == "openai":
+        return _generate_with_openai(
+            model=model,
+            user_message=prompt,
+            system_prompt=system_prompt,
+        )
+    if provider == "anthropic":
+        return _generate_with_anthropic(
+            model=model,
+            user_message=prompt,
+            system_prompt=system_prompt,
+        )
+    raise ResumeParseError(f"Unsupported provider: {provider}")
+
+
+def _extract_review_json(response_text: str) -> dict:
+    parsed = _extract_json_object(response_text)
+    if not parsed:
+        try:
+            parsed = json.loads(response_text)
+        except json.JSONDecodeError as exc:
+            raise ResumeParseError("Review returned invalid JSON.") from exc
+
+    if not isinstance(parsed, dict):
+        raise ResumeParseError("Review returned an unsupported JSON shape.")
+    return parsed
+
+
+def _coerce_index(value, section_length: int, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ResumeParseError(f"Review item has invalid {field}.")
+    if value < 0 or value >= section_length:
+        raise ResumeParseError(f"Review item {field} is out of range.")
+    return value
+
+
+def _coerce_confidence(value) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0.0
+    return max(0.0, min(1.0, float(value)))
+
+
+def _validate_review_items(payload: dict, existing_profile: dict, parsed_profile: dict) -> list[dict]:
+    raw_items = payload.get("review_items")
+    if not isinstance(raw_items, list):
+        raise ResumeParseError("Review response is missing review_items.")
+
+    existing_sections = _profile_sections_for_review(existing_profile)
+    parsed_sections = _profile_sections_for_review(parsed_profile)
+    expected = {
+        (section, index)
+        for section in PROFILE_REVIEW_SECTIONS
+        for index, _item in enumerate(parsed_sections.get(section, []))
+    }
+    seen: set[tuple[str, int]] = set()
+    review_items: list[dict] = []
+
+    for raw_item in raw_items:
+        if not isinstance(raw_item, dict):
+            raise ResumeParseError("Review item has invalid shape.")
+
+        section = _clean_string(raw_item.get("section", ""))
+        if section not in PROFILE_REVIEW_SECTIONS:
+            raise ResumeParseError("Review item has unsupported section.")
+
+        parsed_index = _coerce_index(
+            raw_item.get("parsed_index"),
+            len(parsed_sections.get(section, [])),
+            "parsed_index",
+        )
+        item_key = (section, parsed_index)
+        if item_key in seen:
+            raise ResumeParseError("Review response contains duplicate parsed entries.")
+        seen.add(item_key)
+
+        status = _clean_string(raw_item.get("status", ""))
+        if status not in {"duplicate", "new"}:
+            raise ResumeParseError("Review item has unsupported status.")
+
+        existing_index = None
+        if status == "duplicate":
+            existing_index = _coerce_index(
+                raw_item.get("existing_index"),
+                len(existing_sections.get(section, [])),
+                "existing_index",
+            )
+            allowed_actions = DUPLICATE_REVIEW_ACTIONS
+            default_action = "merge"
+        else:
+            allowed_actions = NEW_REVIEW_ACTIONS
+            default_action = "add"
+
+        recommended_action = _clean_string(raw_item.get("recommended_action", ""))
+        if recommended_action not in allowed_actions:
+            recommended_action = default_action
+
+        review_items.append({
+            "section": section,
+            "status": status,
+            "existing_index": existing_index,
+            "parsed_index": parsed_index,
+            "confidence": _coerce_confidence(raw_item.get("confidence")),
+            "reason": _clean_string(raw_item.get("reason", "")),
+            "recommended_action": recommended_action,
+        })
+
+    if seen != expected:
+        raise ResumeParseError("Review response did not cover every parsed entry.")
+
+    return sorted(review_items, key=lambda item: (PROFILE_REVIEW_SECTIONS.index(item["section"]), item["parsed_index"]))
+
+
+def _generate_review_items(existing_profile: dict, parsed_profile: dict, provider: str, model: str) -> list[dict]:
+    prompt = (
+        PROFILE_REVIEW_USER_PROMPT
+        .replace("%%EXISTING_PROFILE%%", json.dumps(_profile_sections_for_review(existing_profile), ensure_ascii=False))
+        .replace("%%PARSED_PROFILE%%", json.dumps(_profile_sections_for_review(parsed_profile), ensure_ascii=False))
+    )
+    response_text = _generate_text(provider, model, prompt, PROFILE_REVIEW_SYSTEM_PROMPT)
+    return _validate_review_items(_extract_review_json(response_text), existing_profile, parsed_profile)
+
+
 def _merge_fill_blanks(existing: dict, parsed: dict, fields: tuple[str, ...]) -> tuple[dict, list[dict]]:
     merged = dict(existing or {})
     suggestions: list[dict] = []
@@ -345,6 +519,58 @@ def _certificate_key(item: dict) -> str:
     name = _normalize_key(item.get("name", ""))
     issuer = _normalize_key(item.get("issuer", ""))
     return f"{name}|{issuer}" if name else ""
+
+
+def _skill_key(item: dict) -> str:
+    return _normalize_key(item.get("name", ""))
+
+
+def _fallback_review_items(existing_profile: dict, parsed_profile: dict) -> list[dict]:
+    existing = _profile_sections_for_review(existing_profile)
+    parsed = _profile_sections_for_review(parsed_profile)
+    key_builders = {
+        "experience": _experience_key,
+        "projects": _project_key,
+        "education": _education_key,
+        "certificates": _certificate_key,
+        "skills": _skill_key,
+    }
+    review_items: list[dict] = []
+
+    for section in PROFILE_REVIEW_SECTIONS:
+        key_builder = key_builders[section]
+        index_by_key = {
+            key_builder(item): index
+            for index, item in enumerate(existing.get(section, []))
+            if key_builder(item)
+        }
+
+        for parsed_index, parsed_item in enumerate(parsed.get(section, [])):
+            parsed_key = key_builder(parsed_item)
+            existing_index = index_by_key.get(parsed_key) if parsed_key else None
+            if existing_index is None:
+                review_items.append({
+                    "section": section,
+                    "status": "new",
+                    "existing_index": None,
+                    "parsed_index": parsed_index,
+                    "confidence": 0.0,
+                    "reason": "No deterministic match was found.",
+                    "recommended_action": "add",
+                })
+                continue
+
+            review_items.append({
+                "section": section,
+                "status": "duplicate",
+                "existing_index": existing_index,
+                "parsed_index": parsed_index,
+                "confidence": 1.0,
+                "reason": "Matched existing entry by normalized section key.",
+                "recommended_action": "merge",
+            })
+
+    return review_items
 
 
 def _merge_skills(existing_skills: list[dict], parsed_skills: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -462,11 +688,22 @@ def parse_resume_into_profile(uploaded_file, existing_profile: dict, provider: s
     resume_text = extract_resume_text(uploaded_file)
     parsed_profile = _generate_profile_json(resume_text, provider, model)
     merged_profile, suggestions, matches = merge_parsed_profile(existing_profile, parsed_profile)
+    parsed_sections = _profile_sections_for_review(parsed_profile)
 
     warnings = []
     if suggestions:
         warnings.append("Some parsed fields conflict with existing profile values and were left as suggestions.")
-    if not matches:
+
+    if any(parsed_sections.get(section) for section in PROFILE_REVIEW_SECTIONS):
+        try:
+            review_items = _generate_review_items(existing_profile, parsed_profile, provider, model)
+        except Exception:
+            review_items = _fallback_review_items(existing_profile, parsed_profile)
+            warnings.append("AI duplicate review was unavailable, so deterministic review matches were used.")
+    else:
+        review_items = []
+
+    if not matches and not any(item["status"] == "duplicate" for item in review_items):
         warnings.append("No existing entries were matched; parsed entries were prepared as new profile data.")
 
     return {
@@ -474,5 +711,6 @@ def parse_resume_into_profile(uploaded_file, existing_profile: dict, provider: s
         "merged_profile": merged_profile,
         "suggestions": suggestions,
         "matches": matches,
+        "review_items": review_items,
         "warnings": warnings,
     }

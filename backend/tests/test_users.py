@@ -392,6 +392,169 @@ class ResumeParserServiceTests(SimpleTestCase):
         self.assertIn({"section": "experience", "action": "updated", "key": "developer|acme"}, matches)
         self.assertIn({"section": "projects", "action": "added", "key": "new project"}, matches)
 
+    @patch("apps.users.resume_parser.extract_resume_text", return_value="Resume text")
+    @patch(
+        "apps.users.resume_parser._generate_with_openai",
+        side_effect=[
+            """
+            {
+              "experience": [
+                {
+                  "company": "Acme Inc.",
+                  "role": "Software Engineering Intern",
+                  "description": ["Shipped new parser review flow"]
+                }
+              ],
+              "projects": [
+                {
+                  "name": "CoverPilot",
+                  "description": ["Added duplicate review controls"]
+                }
+              ]
+            }
+            """,
+            """
+            {
+              "review_items": [
+                {
+                  "section": "experience",
+                  "status": "duplicate",
+                  "existing_index": 0,
+                  "parsed_index": 0,
+                  "confidence": 0.94,
+                  "reason": "Same internship despite company punctuation and title wording.",
+                  "recommended_action": "merge"
+                },
+                {
+                  "section": "projects",
+                  "status": "duplicate",
+                  "existing_index": 0,
+                  "parsed_index": 0,
+                  "confidence": 0.91,
+                  "reason": "Same project name with spacing removed and different bullets.",
+                  "recommended_action": "merge"
+                }
+              ]
+            }
+            """,
+        ],
+    )
+    def test_parse_resume_review_classifies_variant_project_and_experience_as_duplicates(self, generate_mock, extract_mock):
+        uploaded = SimpleUploadedFile("resume.pdf", b"%PDF-1.4", content_type="application/pdf")
+        existing = {
+            "uid": "uid-1",
+            "email": "user@example.com",
+            "experience": [
+                {
+                    "company": "Acme",
+                    "role": "Software Developer Intern",
+                    "description": ["Old internship bullet"],
+                }
+            ],
+            "projects": [
+                {
+                    "name": "Cover Pilot",
+                    "description": ["Old project bullet"],
+                }
+            ],
+        }
+
+        payload = parse_resume_into_profile(uploaded, existing, "openai", "gpt-5.4-mini")
+
+        self.assertEqual(
+            [
+                (item["section"], item["status"], item["existing_index"], item["recommended_action"])
+                for item in payload["review_items"]
+            ],
+            [
+                ("experience", "duplicate", 0, "merge"),
+                ("projects", "duplicate", 0, "merge"),
+            ],
+        )
+        extract_mock.assert_called_once_with(uploaded)
+        self.assertEqual(generate_mock.call_count, 2)
+
+    @patch("apps.users.resume_parser.extract_resume_text", return_value="Resume text")
+    @patch(
+        "apps.users.resume_parser._generate_with_openai",
+        side_effect=[
+            """
+            {
+              "experience": [{"company": "Orbit", "role": "Engineer"}],
+              "projects": [{"name": "New Project"}],
+              "education": [{"school": "University of Alberta"}],
+              "certificates": [{"name": "AWS Cloud Practitioner", "issuer": "AWS"}],
+              "skills": [{"name": "Django", "category": "Backend"}]
+            }
+            """,
+            """
+            {
+              "review_items": [
+                {"section": "experience", "status": "new", "existing_index": null, "parsed_index": 0, "confidence": 0.99, "reason": "No matching role.", "recommended_action": "add"},
+                {"section": "projects", "status": "new", "existing_index": null, "parsed_index": 0, "confidence": 0.99, "reason": "No matching project.", "recommended_action": "add"},
+                {"section": "education", "status": "new", "existing_index": null, "parsed_index": 0, "confidence": 0.99, "reason": "No matching school.", "recommended_action": "add"},
+                {"section": "certificates", "status": "new", "existing_index": null, "parsed_index": 0, "confidence": 0.99, "reason": "No matching certificate.", "recommended_action": "add"},
+                {"section": "skills", "status": "new", "existing_index": null, "parsed_index": 0, "confidence": 0.99, "reason": "No matching skill.", "recommended_action": "add"}
+              ]
+            }
+            """,
+        ],
+    )
+    def test_parse_resume_review_returns_new_items_for_all_sections(self, generate_mock, extract_mock):
+        uploaded = SimpleUploadedFile("resume.pdf", b"%PDF-1.4", content_type="application/pdf")
+
+        payload = parse_resume_into_profile(uploaded, {"uid": "uid-1", "email": "user@example.com"}, "openai", "gpt-5.4-mini")
+
+        self.assertEqual([item["section"] for item in payload["review_items"]], ["experience", "projects", "education", "certificates", "skills"])
+        self.assertTrue(all(item["status"] == "new" for item in payload["review_items"]))
+        self.assertTrue(all(item["recommended_action"] == "add" for item in payload["review_items"]))
+        extract_mock.assert_called_once_with(uploaded)
+        self.assertEqual(generate_mock.call_count, 2)
+
+    @patch("apps.users.resume_parser.extract_resume_text", return_value="Resume text")
+    @patch(
+        "apps.users.resume_parser._generate_with_openai",
+        side_effect=[
+            """
+            {
+              "projects": [
+                {
+                  "name": "Cover Pilot",
+                  "description": ["Generated resumes"]
+                }
+              ],
+              "skills": [{"name": "Python", "category": "Language"}]
+            }
+            """,
+            "{\"review_items\": []}",
+        ],
+    )
+    def test_parse_resume_review_falls_back_when_ai_review_is_invalid(self, generate_mock, extract_mock):
+        uploaded = SimpleUploadedFile("resume.pdf", b"%PDF-1.4", content_type="application/pdf")
+        existing = {
+            "uid": "uid-1",
+            "email": "user@example.com",
+            "projects": [{"name": "Cover Pilot", "description": ["Old project bullet"]}],
+            "skills": [{"name": "JavaScript", "category": "Language"}],
+        }
+
+        payload = parse_resume_into_profile(uploaded, existing, "openai", "gpt-5.4-mini")
+
+        self.assertIn("AI duplicate review was unavailable, so deterministic review matches were used.", payload["warnings"])
+        self.assertEqual(
+            [(item["section"], item["status"], item["existing_index"], item["recommended_action"]) for item in payload["review_items"]],
+            [
+                ("projects", "duplicate", 0, "merge"),
+                ("skills", "new", None, "add"),
+            ],
+        )
+        self.assertIn("parsed_profile", payload)
+        self.assertIn("merged_profile", payload)
+        self.assertIn("suggestions", payload)
+        self.assertIn("matches", payload)
+        extract_mock.assert_called_once_with(uploaded)
+        self.assertEqual(generate_mock.call_count, 2)
+
     @patch("apps.users.resume_parser.extract_pdf_text", return_value="Resume text")
     def test_extract_resume_text_supports_pdf(self, extract_pdf_mock):
         uploaded = SimpleUploadedFile("resume.pdf", b"%PDF-1.4", content_type="application/pdf")
@@ -433,7 +596,10 @@ class ResumeParserServiceTests(SimpleTestCase):
     @patch("apps.users.resume_parser.extract_resume_text", return_value="Resume text")
     @patch(
         "apps.users.resume_parser._generate_with_openai",
-        return_value='{"full_name":" Taylor Avery ","ignored":"nope","skills":[{"name":" Python ","category":" Backend "}]}',
+        side_effect=[
+            '{"full_name":" Taylor Avery ","ignored":"nope","skills":[{"name":" Python ","category":" Backend "}]}',
+            '{"review_items":[{"section":"skills","status":"new","existing_index":null,"parsed_index":0,"confidence":0.9,"reason":"No matching skill.","recommended_action":"add"}]}',
+        ],
     )
     def test_parse_resume_into_profile_normalizes_llm_json(self, generate_mock, extract_mock):
         uploaded = SimpleUploadedFile("resume.pdf", b"%PDF-1.4", content_type="application/pdf")
@@ -444,5 +610,6 @@ class ResumeParserServiceTests(SimpleTestCase):
         self.assertEqual(payload["parsed_profile"]["skills"], [{"name": "Python", "category": "Backend"}])
         self.assertNotIn("ignored", payload["parsed_profile"])
         self.assertEqual(payload["merged_profile"]["skills"], [{"name": "Python", "category": "Backend"}])
+        self.assertEqual(payload["review_items"][0]["section"], "skills")
         extract_mock.assert_called_once_with(uploaded)
-        generate_mock.assert_called_once()
+        self.assertEqual(generate_mock.call_count, 2)
